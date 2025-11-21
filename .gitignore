@@ -36,3 +36,8 @@ ENV/
 
 # RAG Vector Store (large files, should be built locally)
 backend/rag/vector_store/
+
+# Environment variables (contains API keys)
+.env
+backend/.env
+*.env
