@@ -26,10 +26,13 @@
 6. [Technology Stack](#technology-stack)
 7. [Installation & Setup](#installation--setup)
 8. [Running the Application](#running-the-application)
-9. [Knowledge Base & Prompts](#knowledge-base--prompts)
-10. [API Documentation](#api-documentation)
-11. [Screenshots](#screenshots)
-12. [Documentation](#documentation)
+9. [Pre-generating Voice Mailbox Audio](#pre-generating-voice-mailbox-audio)
+10. [Knowledge Base & Prompts](#knowledge-base--prompts)
+11. [API Documentation](#api-documentation)
+12. [Screenshots](#screenshots)
+13. [Troubleshooting](#troubleshooting)
+14. [Documentation](#documentation)
+15. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -59,6 +62,16 @@ NightWhisper follows a modern full-stack architecture:
 
 The system is designed with modularity in mind, allowing each component to be developed, tested, and maintained independently while working seamlessly together.
 
+### Data Flow
+
+1. **User Input** → Frontend (`ChatScreen.tsx`)
+2. **RAG Retrieval** → Frontend calls `/api/rag/retrieve` to get relevant context
+3. **Chat Request** → Frontend sends message with RAG context to `/api/chat`
+4. **Prompt Building** → Backend combines healer prompt, RAG context, conversation history
+5. **GPT-4o Response** → AI generates empathetic response
+6. **TTS Generation** → Optional audio generation for first greeting message
+7. **Response Display** → Frontend displays message with optional audio playback
+
 ---
 
 ## Key Features
@@ -81,28 +94,40 @@ Four unique AI healer personas, each with distinct personality traits, communica
 - GPT-4o integration with custom system prompts for each healer
 - Context-aware responses that maintain conversation history
 - Empathetic and therapeutic communication style
+- Real-time conversation with smooth UI transitions
 
 ### 3. **Retrieval-Augmented Generation (RAG)**
 - Integration with 9 mental health counseling datasets from HuggingFace
-- Semantic search using sentence transformers
+- Semantic search using sentence transformers (`all-MiniLM-L6-v2`)
 - Context injection to enhance response quality and accuracy
+- Automatic retrieval based on user queries
 
 ### 4. **Text-to-Speech (TTS)**
 - Voice cloning using CosyVoice for each healer
 - Zero-shot voice synthesis with unique voice characteristics
 - Audio playback integrated into chat interface
+- Pre-generated audio for voice mailbox messages
+- Optimized: Only first greeting message generates audio (to save processing time)
 
 ### 5. **Beautiful User Interface**
 - Night-time themed design with calming aesthetics
 - Smooth animations and transitions
 - Day/Night mode toggle
-- Background music player with multiple tracks
+- Background music player with multiple tracks (Joyful, Piano, Soft categories)
 - Responsive design for various screen sizes
+- Floating bubbles and animated backgrounds
 
 ### 6. **User Avatar Selection**
-- Customizable user avatars with multiple styles
+- Customizable user avatars with multiple styles (Soft Anime, Calm Minimal)
 - Gender and style options
 - Personalization for enhanced user experience
+
+### 7. **Interactive Sidebar Features**
+- **📅 Mood Calendar**: Track daily mood with color-coded calendar (1-5 scale)
+- **📝 Diary**: Write and save daily journal entries with date selection
+- **📬 Voice Mailbox**: Receive daily random messages from your healer with audio playback
+- Data persistence using browser localStorage
+- Collapsible sidebar with smooth transitions
 
 ---
 
@@ -120,15 +145,18 @@ Beyond the core requirements, NightWhisper includes several advanced features:
 - **Technology**: CosyVoice zero-shot voice cloning
 - **Features**: 
   - Unique voice for each healer persona
-  - Real-time audio generation
+  - Pre-generated audio for voice mailbox messages
   - Asynchronous processing to avoid blocking chat interface
+  - Automatic GPU detection with CPU fallback
 - **Performance**: Optimized for both CPU and GPU execution
+- **Optimization**: Only first greeting message generates audio; subsequent messages show "No audio" button
 
 ### 3. **Advanced UI/UX Features**
 - **Day/Night Mode**: Toggle between themes for user preference
-- **Background Music**: Integrated music player with multiple categories (Joyful, Piano, Soft)
+- **Background Music**: Integrated music player with multiple categories (Joyful, Piano, Soft), continuous playback across pages
 - **Animations**: Smooth transitions, floating elements, and fade effects
 - **Responsive Design**: Works seamlessly across different screen sizes
+- **Sidebar**: Collapsible sidebar with mood calendar, diary, and voice mailbox
 
 ### 4. **Prompt Engineering**
 - **Custom System Prompts**: Each healer has a carefully crafted system prompt defining personality and communication style
@@ -152,6 +180,10 @@ project-code/
 │   │   ├── AvatarSelectionScreen.tsx  # User avatar selection
 │   │   ├── HealerSelectionScreen.tsx   # Healer selection
 │   │   ├── ChatScreen.tsx        # Main chat interface
+│   │   ├── Sidebar.tsx           # Sidebar container (mood, diary, mailbox)
+│   │   ├── MoodCalendar.tsx      # Mood tracking calendar
+│   │   ├── Diary.tsx             # Journal entries
+│   │   ├── VoiceMailbox.tsx      # Daily healer messages
 │   │   ├── MusicPlayer.tsx       # Background music player
 │   │   └── AnimatedBackground.tsx # Animated background effects
 │   ├── api/                      # API client
@@ -182,6 +214,8 @@ project-code/
 │   │   ├── cosyvoice_service.py  # CosyVoice TTS service
 │   │   ├── test_tts_service.py   # TTS test suite
 │   │   └── README.md             # TTS documentation
+│   ├── scripts/                  # Utility scripts
+│   │   └── generate_voice_mailbox_audio.py  # Pre-generate TTS audio
 │   ├── CosyVoice/                # CosyVoice library (third-party)
 │   │   ├── pretrained_models/    # Model files (download separately)
 │   │   ├── bunny.wav             # Voice clone files
@@ -189,6 +223,8 @@ project-code/
 │   │   ├── dear.wav
 │   │   ├── dog.wav
 │   │   └── original.txt          # Prompt texts for voice clones
+│   ├── public/
+│   │   └── tts_audio/            # Generated TTS audio files
 │   ├── requirements.txt          # Python dependencies
 │   ├── start_server.sh           # Server startup script
 │   ├── .env                      # Environment variables (create this)
@@ -198,6 +234,7 @@ project-code/
 │   ├── fig/                      # Images (backgrounds, avatars, etc.)
 │   ├── avatar/                   # User avatar images
 │   ├── music/                    # Background music files
+│   ├── tts_audio/                # Pre-generated TTS audio files
 │   ├── comp4431_workflow.png     # System workflow diagram
 │   ├── page1.png                 # Screenshot: Landing page
 │   ├── page2.png                 # Screenshot: Avatar selection
@@ -234,12 +271,13 @@ project-code/
 - **LangChain** - LLM application framework
 - **ChromaDB** - Vector database
 - **HuggingFace Transformers** - Model library
-- **Sentence Transformers** - Embedding models
+- **Sentence Transformers** - Embedding models (`all-MiniLM-L6-v2`)
 - **CosyVoice** - TTS and voice cloning
 
 ### Data & Storage
 - **HuggingFace Datasets** - Mental health datasets
 - **ChromaDB** - Vector store for RAG
+- **Browser localStorage** - Client-side data persistence (mood calendar, diary)
 
 ---
 
@@ -366,6 +404,43 @@ http://localhost:5173
 
 ---
 
+## Pre-generating Voice Mailbox Audio
+
+To enable instant playback of voice mailbox messages, pre-generate the audio files:
+
+```bash
+# Make sure you're in the backend directory with nightwhisper environment activated
+cd backend
+conda activate nightwhisper
+
+# Run the generation script
+python scripts/generate_voice_mailbox_audio.py
+```
+
+**Important Notes:**
+- This takes **3-5 minutes per message on CPU** (24 messages total = ~2 hours)
+- On GPU, it takes **3-10 seconds per message** (~4 minutes total)
+- The script automatically saves files to both `backend/public/tts_audio/` and `public/tts_audio/`
+- **If files already exist, they will be skipped** - safe to run multiple times
+- You can safely interrupt and resume - the script will skip already-generated files
+
+**Running in Background (Recommended):**
+
+```bash
+# Create a screen session
+screen -S tts_generation
+
+# Run the script
+cd backend
+conda activate nightwhisper
+python scripts/generate_voice_mailbox_audio.py
+
+# Detach: Press Ctrl+A then D
+# Reattach later: screen -r tts_generation
+```
+
+---
+
 ## Knowledge Base & Prompts
 
 ### Knowledge Base
@@ -424,13 +499,13 @@ POST /api/chat
 Content-Type: application/json
 
 {
-  "healer_id": "milo",
-  "user_input": "I'm feeling anxious",
-  "conversation_history": [
+  "healerId": "milo",
+  "userInput": "I'm feeling anxious",
+  "conversationHistory": [
     {"role": "user", "content": "Hello"},
     {"role": "assistant", "content": "Hi, how can I help you?"}
   ],
-  "rag_context": "..." (optional)
+  "ragContext": "..." (optional)
 }
 ```
 
@@ -449,7 +524,7 @@ Content-Type: application/json
 
 {
   "query": "anxiety management techniques",
-  "top_k": 3
+  "topK": 3
 }
 ```
 
@@ -472,14 +547,14 @@ Content-Type: application/json
 
 {
   "text": "Hello, I'm here to help you.",
-  "healer_id": "milo"
+  "healerId": "milo"
 }
 ```
 
 Response:
 ```json
 {
-  "audio_url": "/api/tts/audio/tts_milo_abc123.wav",
+  "audioUrl": "/api/tts/audio/tts_milo_abc123.wav",
   "status": "ready",
   "error": null
 }
@@ -512,6 +587,87 @@ Returns the generated audio file.
 
 ---
 
+## Troubleshooting
+
+### Frontend Issues
+
+**Port already in use:**
+```bash
+# Find and kill process using port 5173
+lsof -ti:5173 | xargs kill -9
+```
+
+**Changes not reflecting:**
+- Hard refresh browser (Ctrl+Shift+R or Cmd+Shift+R)
+- Clear browser cache
+- Restart dev server
+
+### Backend Issues
+
+**Module not found errors:**
+- Ensure conda environment is activated: `conda activate nightwhisper`
+- Reinstall dependencies: `pip install -r requirements.txt`
+
+**API key not working:**
+- Check `backend/.env` file exists and contains `OPENAI_API_KEY=your_key`
+- Restart backend server after adding/changing API key
+
+**RAG not working:**
+- Ensure knowledge base is built: `python -m rag.build_kb`
+- Check `backend/rag/vector_store/` directory exists
+
+### TTS Issues
+
+**TTS generation fails:**
+- Check CosyVoice model is downloaded in `backend/CosyVoice/pretrained_models/`
+- Verify voice clone files exist: `bunny.wav`, `owl.wav`, `dear.wav`, `dog.wav`
+- Check backend logs for detailed error messages
+- Run test suite: `python backend/tts/test_tts_service.py`
+
+**TTS generation very slow:**
+- This is normal on CPU (3-5 minutes per message)
+- Use GPU for faster generation (3-10 seconds per message)
+- Check GPU availability: `python -c "import torch; print(torch.cuda.is_available())"`
+
+**Audio not playing:**
+- Check browser console for errors
+- Verify audio file exists at the URL
+- Check CORS settings if accessing from different domain
+- Ensure audio format is WAV (browser-supported)
+
+### Sidebar Issues
+
+**Sidebar not visible:**
+- Check browser console for errors
+- Verify `Sidebar` component is imported in `ChatScreen.tsx`
+- Ensure chat area has correct margin when sidebar is open
+
+**Mood/Diary data not saving:**
+- Check browser localStorage is enabled (not in private/incognito mode)
+- Open browser DevTools → Application → Local Storage
+- Verify keys: `moodCalendar` and `diaryEntries`
+
+**Voice mailbox audio not playing:**
+- Ensure audio files exist in `public/tts_audio/` directory
+- Run pre-generation script: `python backend/scripts/generate_voice_mailbox_audio.py`
+- Check browser console for audio loading errors
+- Verify file paths in `VoiceMailbox.tsx` match actual files
+
+### Performance Issues
+
+**API responses slow:**
+- Check if RAG retrieval is enabled (adds ~1-2 seconds)
+- Verify network connection
+- Check backend logs for GPT-4o API delays
+- Consider disabling RAG temporarily for testing: set `enableRAG: false` in `chatService.ts`
+
+**Music not playing:**
+- Check browser autoplay restrictions
+- Click play button to enable audio
+- Verify music files exist in `public/music/` directory
+
+---
+
 ## Documentation
 
 ### Project Documentation
@@ -532,6 +688,7 @@ Returns the generated audio file.
 - **Frontend Healer Data**: `src/data/healers.ts` - Frontend healer definitions
 - **API Server**: `backend/api/server.py` - Main backend server
 - **Chat Service**: `src/services/chatService.ts` - Frontend chat logic with RAG
+- **Voice Mailbox Messages**: `src/components/VoiceMailbox.tsx` - Edit message content
 
 ---
 
@@ -545,6 +702,8 @@ Potential improvements for future versions:
 4. **Mobile App**: Native mobile application
 5. **Advanced Analytics**: Conversation analytics and insights
 6. **Integration with External Services**: Connect with mental health resources
+7. **Real-time TTS for All Messages**: Optimize TTS generation for faster real-time audio
+8. **Cloud Deployment**: Deploy to cloud for public access
 
 ---
 
