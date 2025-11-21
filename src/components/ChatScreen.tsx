@@ -1,44 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnimatedBackground } from './AnimatedBackground';
 import { Healer, Message } from '../types';
+import { getChatResponse, convertToChatMessage } from '../services/chatService';
+import { ChatMessage } from '../api/types';
 
 interface ChatScreenProps {
   healer: Healer;
   userAvatar: string;
 }
 
-// Generate fake healer responses based on selected healer
-const getFakeResponse = (healer: Healer): string => {
-  const responses: Record<string, string[]> = {
-    leo: [
-      "Let's break this down together. What's the core issue you're facing?",
-      "I see multiple layers here. Can we examine this step by step?",
-      "That's a complex situation. What patterns do you notice in how you're thinking about this?",
-      "Let's approach this analytically. What would a clear perspective look like here?",
-    ],
-    max: [
-      "I'm so glad you're here sharing this! Even in the darkness, there are small lights.",
-      "You're doing something brave by talking about this. What's one thing that felt okay today?",
-      "I believe in your strength, even when it doesn't feel like you have any. What's one step forward?",
-      "Thank you for trusting me with this. You're not alone, and there's always a way through.",
-    ],
-    luna: [
-      "Take a deep breath with me. There's no rush—we can sit with this together.",
-      "I feel the restlessness in your words. Let's find a quiet space within.",
-      "Everything can slow down here. What do you notice when you pause?",
-      "Your breath is steady. What would it feel like to let this moment be as it is?",
-    ],
-    milo: [
-      "I hear how heavy this feels for you. Would you like to tell me what happened today?",
-      "That sounds really difficult. I'm here with you, and your feelings are completely valid.",
-      "Thank you for sharing that with me. What would feel most helpful right now?",
-      "I can sense the weight of what you're carrying. You don't have to hold it alone.",
-    ],
-  };
-
-  const healerResponses = responses[healer.id] || responses.milo;
-  return healerResponses[Math.floor(Math.random() * healerResponses.length)];
-};
+// Note: Fake responses removed - now using API
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) => {
   const [messages, setMessages] = useState<Message[]>([
@@ -52,6 +23,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Maintain conversation history in API format
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      content: `Hello, I'm ${healer.name}. ${healer.description.split('.')[0]}. I'll stay with you while you talk.`,
+    },
+  ]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -61,29 +40,90 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
   const sendMessage = async () => {
     if (!inputText.trim() || isSending) return;
 
+    const userInput = inputText.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: userInput,
       sender: 'user',
       timestamp: new Date(),
     };
 
+    // Add user message to UI
     setMessages((prev) => [...prev, userMessage]);
+    
+    // Add user message to conversation history
+    const userChatMessage = convertToChatMessage(userInput, 'user');
+    const updatedHistory = [...conversationHistory, userChatMessage];
+    setConversationHistory(updatedHistory);
+    
     setInputText('');
     setIsSending(true);
 
-    // Simulate API delay (0.8-1.2 seconds)
-    const delay = 800 + Math.random() * 400;
-    setTimeout(() => {
-      const healerResponse: Message = {
+    try {
+      // Get response from backend API
+      console.log('Calling API with:', { healerId: healer.id, userInput, historyLength: updatedHistory.length });
+      const response = await getChatResponse(userInput, updatedHistory, healer, true);
+      console.log('API response received:', response);
+      
+      if (response.error) {
+        console.error('Chat error:', response.error);
+        // Fallback to a simple message if API fails
+        const fallbackMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: `[API Error: ${response.error}] I'm here with you. Could you tell me more about what's on your mind?`,
+          sender: 'healer',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, fallbackMessage]);
+        setConversationHistory((prev) => [
+          ...prev,
+          convertToChatMessage(fallbackMessage.text, 'healer'),
+        ]);
+      } else if (response.message && response.message.trim()) {
+        // Success: use API response
+        const healerResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          text: response.message,
+          sender: 'healer',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, healerResponse]);
+        setConversationHistory((prev) => [
+          ...prev,
+          convertToChatMessage(response.message, 'healer'),
+        ]);
+      } else {
+        // Empty response fallback
+        console.warn('Empty response from API');
+        const fallbackMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "I'm here with you. Could you tell me more about what's on your mind?",
+          sender: 'healer',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, fallbackMessage]);
+        setConversationHistory((prev) => [
+          ...prev,
+          convertToChatMessage(fallbackMessage.text, 'healer'),
+        ]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Fallback message
+      const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: getFakeResponse(healer),
+        text: `[Error: ${error instanceof Error ? error.message : 'Unknown error'}] I'm here with you. Could you tell me more about what's on your mind?`,
         sender: 'healer',
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, healerResponse]);
+      setMessages((prev) => [...prev, fallbackMessage]);
+      setConversationHistory((prev) => [
+        ...prev,
+        convertToChatMessage(fallbackMessage.text, 'healer'),
+      ]);
+    } finally {
       setIsSending(false);
-    }, delay);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

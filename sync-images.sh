@@ -1,24 +1,24 @@
 #!/bin/bash
 
-# 同步根目录 fig/ 到 public/fig/
-echo "🔄 同步图片文件..."
-echo "从: fig/"
-echo "到: public/fig/"
+# Sync images from fig/ to public/fig/
+echo "🔄 Syncing image files..."
+echo "From: fig/"
+echo "To: public/fig/"
 echo ""
 
-# 检查源目录是否存在
+# Check if source directory exists
 if [ ! -d "fig" ]; then
-    echo "❌ 错误: fig/ 目录不存在"
+    echo "❌ Error: fig/ directory not found"
     exit 1
 fi
 
-# 确保目标目录存在
+# Ensure target directory exists
 mkdir -p public/fig
 
-# 同步文件
+# Sync files
 cp -r fig/* public/fig/
 
-echo "✅ 同步完成！"
+echo "✅ Sync complete!"
 echo ""
-echo "📝 提示: 如果浏览器没有更新，请硬刷新 (Cmd + Shift + R)"
+echo "📝 Tip: If browser doesn't update, hard refresh (Cmd + Shift + R)"
 

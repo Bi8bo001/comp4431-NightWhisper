@@ -23,3 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# RAG Vector Store (large files, should be built locally)
+backend/rag/vector_store/

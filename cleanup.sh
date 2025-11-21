@@ -1,29 +1,41 @@
 #!/bin/bash
 
-# 清理占用端口的 Vite 进程
-echo "🔍 查找占用端口的进程..."
+# Cleanup script for NightWhisper
+# Kills processes occupying frontend (5173, 5174) and backend (8000) ports
 
-# 查找占用 5173 和 5174 端口的进程
-PIDS=$(lsof -ti:5173,5174 2>/dev/null)
+echo "🔍 Searching for processes using ports..."
+
+# Find processes using frontend and backend ports
+PIDS=$(lsof -ti:5173,5174,8000 2>/dev/null)
 
 if [ -z "$PIDS" ]; then
-    echo "✅ 没有发现占用端口的进程"
+    echo "✅ No processes found using these ports"
 else
-    echo "🛑 发现以下进程占用端口: $PIDS"
-    echo "正在终止这些进程..."
+    echo "🛑 Found processes using ports: $PIDS"
+    echo "Terminating these processes..."
     kill -9 $PIDS 2>/dev/null
     sleep 1
-    echo "✅ 进程已清理完成"
+    echo "✅ Processes terminated"
 fi
 
-# 也清理所有 vite 相关进程
+# Also cleanup any vite processes
 VITE_PIDS=$(ps aux | grep -i '[v]ite' | awk '{print $2}')
 if [ ! -z "$VITE_PIDS" ]; then
-    echo "🛑 发现额外的 Vite 进程，正在清理..."
+    echo "🛑 Found additional Vite processes, cleaning up..."
     kill -9 $VITE_PIDS 2>/dev/null
-    echo "✅ 所有 Vite 进程已清理"
+    echo "✅ All Vite processes cleaned"
+fi
+
+# Also cleanup any python server processes
+PYTHON_PIDS=$(ps aux | grep -i '[p]ython.*server.py' | awk '{print $2}')
+if [ ! -z "$PYTHON_PIDS" ]; then
+    echo "🛑 Found additional Python server processes, cleaning up..."
+    kill -9 $PYTHON_PIDS 2>/dev/null
+    echo "✅ All Python server processes cleaned"
 fi
 
 echo ""
-echo "现在可以重新运行: npm run dev"
+echo "✅ Cleanup complete! You can now run:"
+echo "   Frontend: npm run dev"
+echo "   Backend: cd backend && ./start_server.sh"
 
