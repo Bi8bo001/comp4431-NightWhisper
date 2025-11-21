@@ -28,12 +28,12 @@ pip install -r requirements.txt
 
 Each healer needs a corresponding voice clone file (`.wav` format, 16kHz sample rate):
 
-- `milo` (Rabbit) → `bunny.wav`
-- `leo` (Owl) → `owl.wav` ✅ (exists)
-- `luna` (Deer) → `deer.wav` ✅ (exists)
-- `max` (Dog) → `dog.wav`
+- `milo` (Rabbit) → `bunny.wav` ✅
+- `leo` (Owl) → `owl.wav` ✅
+- `luna` (Deer) → `dear.wav` ✅
+- `max` (Dog) → `dog.wav` ✅
 
-**Note**: Currently, `bunny.wav` and `dog.wav` are missing. Please add these files to `backend/CosyVoice/` directory.
+All voice clone files should be placed in `backend/CosyVoice/` directory.
 
 The voice clone files should be:
 - WAV format
@@ -97,41 +97,6 @@ The TTS functionality is automatically integrated into the chat interface:
 1. **Voice Cloning**: Uses CosyVoice's zero-shot voice cloning feature
 2. **Asynchronous Generation**: TTS generation happens in the background, so it doesn't block the chat
 3. **Caching**: Generated audio files are stored temporarily and can be replayed
-
-## Troubleshooting
-
-### Model Not Found
-
-If you see "Model directory not found", make sure you've cloned the model:
-
-```bash
-cd backend/CosyVoice
-mkdir -p pretrained_models
-git clone https://www.modelscope.cn/iic/CosyVoice-300M.git pretrained_models/CosyVoice-300M
-```
-
-### Voice File Not Found
-
-If you see "Voice file not found", ensure all voice clone files exist:
-
-- `backend/CosyVoice/bunny.wav`
-- `backend/CosyVoice/owl.wav`
-- `backend/CosyVoice/deer.wav`
-- `backend/CosyVoice/dog.wav`
-
-### Import Errors
-
-If you see import errors, make sure you're in the correct conda environment and have installed all dependencies:
-
-```bash
-conda activate nightwhisper
-cd backend/CosyVoice
-pip install -r requirements.txt
-```
-
-### Slow Generation
-
-TTS generation can take several seconds, especially on CPU. This is normal. The UI shows a "Generating..." state while waiting.
 
 ## Performance Notes
 

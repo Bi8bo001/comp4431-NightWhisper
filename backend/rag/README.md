@@ -103,30 +103,8 @@ The knowledge base includes:
 3. **Context injection** → Chunks are added to system prompt as "RELEVANT PSYCHOLOGICAL CONTEXT"
 4. **GPT-4o response** → Model uses context to inform response while maintaining healer persona
 
-## Troubleshooting
+## Notes
 
-### "Vector store not found"
-
-Run the knowledge base builder:
-```bash
-python -m rag.build_kb
-```
-
-### "RAG module not available"
-
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-### Slow retrieval
-
-The first retrieval loads the vector store into memory (~1-2 seconds). Subsequent retrievals are fast.
-
-### Out of memory
-
-If building the KB causes memory issues, you can:
-1. Reduce the number of datasets in `build_kb.py`
-2. Filter datasets by size before processing
-3. Use a smaller embedding model
+- The first retrieval loads the vector store into memory (~1-2 seconds). Subsequent retrievals are fast.
+- If building the knowledge base causes memory issues, you can reduce the number of datasets in `build_kb.py` or use a smaller embedding model.
 
