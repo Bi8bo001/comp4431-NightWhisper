@@ -29,3 +29,14 @@ export interface RAGRetrievalResponse {
   error?: string;
 }
 
+export interface TTSRequest {
+  text: string;
+  healerId: string;
+}
+
+export interface TTSResponse {
+  audioUrl?: string;
+  error?: string;
+  status: 'generating' | 'ready' | 'error';
+}
+

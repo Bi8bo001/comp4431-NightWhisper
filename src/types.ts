@@ -15,5 +15,7 @@ export interface Message {
   text: string;
   sender: 'user' | 'healer';
   timestamp: Date;
+  audioUrl?: string; // URL to TTS audio file (for healer messages)
+  ttsStatus?: 'idle' | 'generating' | 'ready' | 'error'; // TTS generation status
 }
 

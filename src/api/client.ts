@@ -5,7 +5,7 @@
  * API base URL can be configured via VITE_API_BASE_URL environment variable.
  */
 
-import { ChatRequest, ChatResponse, RAGRetrievalRequest, RAGRetrievalResponse } from './types';
+import { ChatRequest, ChatResponse, RAGRetrievalRequest, RAGRetrievalResponse, TTSRequest, TTSResponse } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -94,6 +94,47 @@ export async function healthCheck(): Promise<boolean> {
     return response.ok;
   } catch (error) {
     return false;
+  }
+}
+
+/**
+ * Generate TTS audio for a healer's message
+ * 
+ * @param request - TTS request with text and healer ID
+ * @returns TTS response with audio URL or error
+ */
+export async function generateTTS(request: TTSRequest): Promise<TTSResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/tts/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: request.text,
+        healerId: request.healerId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data: TTSResponse = await response.json();
+    
+    // Convert relative URL to absolute URL
+    if (data.audioUrl && !data.audioUrl.startsWith('http')) {
+      data.audioUrl = `${API_BASE_URL}${data.audioUrl}`;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error generating TTS:', error);
+    return {
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Failed to generate TTS',
+    };
   }
 }
 

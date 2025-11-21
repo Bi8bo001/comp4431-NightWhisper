@@ -3,6 +3,7 @@ import { AnimatedBackground } from './AnimatedBackground';
 import { Healer, Message } from '../types';
 import { getChatResponse, convertToChatMessage } from '../services/chatService';
 import { ChatMessage } from '../api/types';
+import { generateTTS } from '../api/client';
 
 interface ChatScreenProps {
   healer: Healer;
@@ -87,12 +88,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
           text: response.message,
           sender: 'healer',
           timestamp: new Date(),
+          ttsStatus: 'idle', // Start with 'idle' (will show "No audio" until generation starts)
         };
         setMessages((prev) => [...prev, healerResponse]);
         setConversationHistory((prev) => [
           ...prev,
           convertToChatMessage(response.message, 'healer'),
         ]);
+        
+        // Trigger TTS generation asynchronously (don't wait for it)
+        // This will update status to 'generating' -> 'ready' or 'error'
+        generateTTSForMessage(healerResponse.id, response.message);
       } else {
         // Empty response fallback
         console.warn('Empty response from API');
@@ -132,6 +138,56 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  // Generate TTS for a healer message
+  const generateTTSForMessage = async (messageId: string, text: string) => {
+    // Update status to generating
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, ttsStatus: 'generating' } : msg
+      )
+    );
+
+    try {
+      const ttsResponse = await generateTTS({
+        text: text,
+        healerId: healer.id,
+      });
+
+      if (ttsResponse.status === 'ready' && ttsResponse.audioUrl) {
+        // Update message with audio URL - ready to play
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, audioUrl: ttsResponse.audioUrl, ttsStatus: 'ready' }
+              : msg
+          )
+        );
+      } else {
+        // Update status to error - will show "No audio"
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId ? { ...msg, ttsStatus: 'error' } : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error generating TTS:', error);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, ttsStatus: 'error' } : msg
+        )
+      );
+    }
+  };
+
+  // Play audio for a message
+  const playAudio = (audioUrl: string) => {
+    const audio = new Audio(audioUrl);
+    audio.play().catch((error) => {
+      console.error('Error playing audio:', error);
+    });
   };
 
   return (
@@ -219,23 +275,84 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
                   />
                 )}
                 {/* Message bubble */}
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 transition-all duration-500 ${
-                    message.sender === 'user'
-                      ? 'text-white shadow-lg'
-                      : isDayMode ? 'bg-white/80 text-gray-800' : 'bg-navy/70 text-white'
-                  }`}
-                  style={
-                    message.sender === 'user'
-                      ? { 
-                          backgroundColor: isDayMode 
-                            ? 'rgba(99, 102, 241, 0.25)' // indigo with transparency for day mode
-                            : 'rgba(83, 255, 206, 0.23)' // lavender-dark with 70% opacity for night mode
+                <div className="flex flex-col gap-2 max-w-[75%]">
+                  <div
+                    className={`rounded-2xl px-4 py-3 transition-all duration-500 ${
+                      message.sender === 'user'
+                        ? 'text-white shadow-lg'
+                        : isDayMode ? 'bg-white/80 text-gray-800' : 'bg-navy/70 text-white'
+                    }`}
+                    style={
+                      message.sender === 'user'
+                        ? { 
+                            backgroundColor: isDayMode 
+                              ? 'rgba(99, 102, 241, 0.25)' // indigo with transparency for day mode
+                              : 'rgba(83, 255, 206, 0.23)' // lavender-dark with 70% opacity for night mode
+                          }
+                        : undefined
+                    }
+                  >
+                    <p className="text-sm leading-relaxed">{message.text}</p>
+                  </div>
+                  
+                  {/* TTS Play Button (only for healer messages) */}
+                  {message.sender === 'healer' && (
+                    <button
+                      onClick={() => {
+                        if (message.audioUrl && message.ttsStatus === 'ready') {
+                          playAudio(message.audioUrl);
                         }
-                      : undefined
-                  }
-                >
-                  <p className="text-sm leading-relaxed">{message.text}</p>
+                      }}
+                      disabled={message.ttsStatus !== 'ready'}
+                      className={`self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
+                        message.ttsStatus === 'ready'
+                          ? isDayMode
+                            ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80 hover:scale-105 shadow-md shadow-indigo-300/30'
+                            : 'bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 hover:scale-105 shadow-md shadow-indigo-500/30'
+                          : message.ttsStatus === 'generating'
+                          ? isDayMode
+                            ? 'bg-gray-200/60 text-gray-600 cursor-wait'
+                            : 'bg-gray-600/40 text-gray-400 cursor-wait'
+                          : // 'idle' or 'error' - both show "No audio" and are disabled
+                          isDayMode
+                            ? 'bg-gray-200/40 text-gray-500 cursor-not-allowed opacity-60'
+                            : 'bg-gray-600/30 text-gray-500 cursor-not-allowed opacity-60'
+                      }`}
+                      title={
+                        message.ttsStatus === 'ready'
+                          ? 'Play audio'
+                          : message.ttsStatus === 'generating'
+                          ? 'Generating audio...'
+                          : message.ttsStatus === 'idle'
+                          ? 'Audio generation not started'
+                          : 'Audio not available'
+                      }
+                    >
+                      {message.ttsStatus === 'generating' ? (
+                        <>
+                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Generating...</span>
+                        </>
+                      ) : message.ttsStatus === 'ready' ? (
+                        <>
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                          <span>Listen</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                          </svg>
+                          <span>No audio</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
                 {/* User avatar in messages (right side) */}
                 {message.sender === 'user' && (
