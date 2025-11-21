@@ -4,10 +4,11 @@ import { Healer, Message } from '../types';
 
 interface ChatScreenProps {
   healer: Healer;
+  userAvatar: string;
 }
 
 // Generate fake healer responses based on selected healer
-const getFakeResponse = (healer: Healer, userMessage: string): string => {
+const getFakeResponse = (healer: Healer): string => {
   const responses: Record<string, string[]> = {
     leo: [
       "Let's break this down together. What's the core issue you're facing?",
@@ -39,7 +40,7 @@ const getFakeResponse = (healer: Healer, userMessage: string): string => {
   return healerResponses[Math.floor(Math.random() * healerResponses.length)];
 };
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({ healer }) => {
+export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -76,7 +77,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer }) => {
     setTimeout(() => {
       const healerResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: getFakeResponse(healer, inputText),
+        text: getFakeResponse(healer),
         sender: 'healer',
         timestamp: new Date(),
       };
@@ -129,7 +130,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer }) => {
                   message.sender === 'user' ? 'justify-end' : 'justify-start'
                 } animate-fadeIn`}
               >
-                {/* Healer avatar in messages */}
+                {/* Healer avatar in messages (left side) */}
                 {message.sender === 'healer' && (
                   <img
                     src={healer.avatarSrc}
@@ -137,16 +138,29 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer }) => {
                     className="h-12 w-12 rounded-full object-cover flex-shrink-0"
                   />
                 )}
+                {/* Message bubble */}
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                     message.sender === 'user'
-                      ? 'bg-lavender-DEFAULT text-white'
+                      ? 'text-white shadow-lg'
                       : 'bg-navy/70 text-white'
                   }`}
+                  style={
+                    message.sender === 'user'
+                      ? { backgroundColor: 'rgba(83, 255, 206, 0.23)' } // lavender-dark with 70% opacity
+                      : undefined
+                  }
                 >
                   <p className="text-sm leading-relaxed">{message.text}</p>
                 </div>
-                {/* User messages don't have avatar */}
+                {/* User avatar in messages (right side) */}
+                {message.sender === 'user' && (
+                  <img
+                    src={userAvatar}
+                    alt="You"
+                    className="h-12 w-12 rounded-full object-cover flex-shrink-0 border-2 border-indigo-400/60"
+                  />
+                )}
               </div>
             ))}
             {isSending && (

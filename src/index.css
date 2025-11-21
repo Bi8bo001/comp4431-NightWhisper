@@ -21,6 +21,16 @@ body {
   min-height: 100vh;
 }
 
+/* Hide scrollbar for avatar selection */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
 /* Star and bubble animations - defined directly in CSS for reliability */
 @keyframes starFloat {
   0%, 100% {

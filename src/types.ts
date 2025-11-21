@@ -8,7 +8,7 @@ export interface Healer {
   bubbleColor: string; // CSS color for message bubbles
 }
 
-export type Screen = 'landing' | 'healer' | 'chat';
+export type Screen = 'landing' | 'avatar' | 'healer' | 'chat';
 
 export interface Message {
   id: string;
