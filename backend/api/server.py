@@ -10,10 +10,13 @@ This server handles:
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
+import asyncio
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +33,14 @@ try:
     from prompts.healers import healer_prompts, safety_guidelines
 except ImportError as e:
     raise ImportError(f"Cannot import prompts.healers: {e}. Make sure prompts/healers.py exists.")
+
+# Import TTS service (optional, will fail gracefully if not available)
+try:
+    from tts.cosyvoice_service import get_tts_service
+    TTS_AVAILABLE = True
+except ImportError as e:
+    print(f"TTS module not available: {e}. TTS functionality will be disabled.")
+    TTS_AVAILABLE = False
 
 app = FastAPI(title="NightWhisper API", version="1.0.0")
 
@@ -77,6 +88,20 @@ class RAGRetrievalRequest(BaseModel):
 class RAGRetrievalResponse(BaseModel):
     chunks: List[str]
     error: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str
+    healerId: str
+    
+    class Config:
+        populate_by_name = True
+
+
+class TTSResponse(BaseModel):
+    audioUrl: Optional[str] = None
+    error: Optional[str] = None
+    status: str  # 'generating', 'ready', 'error'
 
 
 # ==================== Helper Functions ====================
@@ -267,6 +292,94 @@ async def retrieve_rag(request: RAGRetrievalRequest):
             chunks=[],
             error=f"RAG retrieval error: {str(e)}"
         )
+
+
+@app.post("/api/tts/generate", response_model=TTSResponse)
+async def generate_tts(request: TTSRequest):
+    """
+    TTS generation endpoint.
+    
+    Generates speech audio for the given text using the healer's voice clone.
+    
+    Receives:
+    - text: Text to synthesize
+    - healerId: ID of the healer (milo, leo, luna, max)
+    
+    Returns:
+    - audioUrl: URL to the generated audio file (relative path)
+    - status: 'generating', 'ready', or 'error'
+    """
+    if not TTS_AVAILABLE:
+        return TTSResponse(
+            audioUrl=None,
+            error="TTS service is not available. Please ensure CosyVoice is properly set up.",
+            status="error"
+        )
+    
+    try:
+        print(f"Received TTS request: healerId={request.healerId}, text={request.text[:50]}...")
+        
+        # Run TTS generation in a thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        tts_service = get_tts_service()
+        
+        # Generate audio file
+        success, output_path = await loop.run_in_executor(
+            None,
+            tts_service.generate_speech,
+            request.text,
+            request.healerId
+        )
+        
+        if success and output_path:
+            # Convert absolute path to relative URL for frontend
+            # The file will be served from the backend's static files
+            audio_filename = Path(output_path).name
+            audio_url = f"/api/tts/audio/{audio_filename}"
+            
+            print(f"TTS generation successful: {audio_url}")
+            return TTSResponse(
+                audioUrl=audio_url,
+                status="ready"
+            )
+        else:
+            return TTSResponse(
+                audioUrl=None,
+                error="Failed to generate speech audio.",
+                status="error"
+            )
+    
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in TTS generation: {e}")
+        print(f"Traceback: {error_trace}")
+        return TTSResponse(
+            audioUrl=None,
+            error=f"TTS generation error: {str(e)}",
+            status="error"
+        )
+
+
+@app.get("/api/tts/audio/{filename}")
+async def get_audio_file(filename: str):
+    """
+    Serve generated audio files.
+    
+    This endpoint serves the generated TTS audio files to the frontend.
+    """
+    import tempfile
+    temp_dir = Path(tempfile.gettempdir())
+    audio_path = temp_dir / filename
+    
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    return FileResponse(
+        path=str(audio_path),
+        media_type="audio/wav",
+        filename=filename
+    )
 
 
 if __name__ == "__main__":
