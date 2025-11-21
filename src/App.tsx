@@ -3,6 +3,7 @@ import { LandingScreen } from './components/LandingScreen';
 import { AvatarSelectionScreen } from './components/AvatarSelectionScreen';
 import { HealerSelectionScreen } from './components/HealerSelectionScreen';
 import { ChatScreen } from './components/ChatScreen';
+import { MusicPlayer } from './components/MusicPlayer';
 import { Screen, Healer } from './types';
 
 function App() {
@@ -36,6 +37,12 @@ function App() {
       {currentScreen === 'chat' && selectedHealer && (
         <ChatScreen healer={selectedHealer} userAvatar={userAvatar} />
       )}
+      
+      {/* Global Music Player - shows selection UI only in chat screen */}
+      <MusicPlayer 
+        showSelection={currentScreen === 'chat'} 
+        defaultTrack="/music/soft-moonlit-haze.mp3" 
+      />
     </div>
   );
 }

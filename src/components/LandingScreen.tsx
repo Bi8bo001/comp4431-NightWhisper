@@ -12,24 +12,26 @@ export const LandingScreen: React.FC<LandingScreenProps> = ({ onGetStarted }) =>
         <div className="w-full max-w-[480px] animate-fadeIn">
           {/* Main card */}
           <div className="rounded-2xl bg-navy/70 p-8 shadow-xl backdrop-blur-sm">
-            {/* Moon area - visual space at top */}
-            <div className="mb-8 flex justify-center">
-              <div className="h-24 w-24 rounded-full bg-lavender-light/20 blur-xl"></div>
+            {/* Slogan Image - inside card, above title */}
+            <div className="mb-3 flex justify-center animate-fadeIn" style={{ animationDelay: '0.1s' }}>
+              <img 
+                src="/fig/slogan.png" 
+                alt="NightWhisper Slogan" 
+                className="max-w-full h-auto drop-shadow-2xl"
+                style={{ 
+                  maxHeight: '160px',
+                  filter: 'drop-shadow(0 0 20px rgba(139, 92, 246, 0.3))',
+                }}
+              />
             </div>
 
             {/* Text content */}
-            <h1 className="mb-4 text-center text-4xl font-semibold text-white">
+            <h1 className="mb-8 text-center text-4xl font-semibold text-white">
               Welcome to NightWhisper
             </h1>
-            <p className="mb-6 text-center text-lg text-lavender-light">
-              A gentle space for your late-night thoughts.
+            <p className="mb-12 text-center text-xl text-lavender-light">
+              Softly, You Heal.
             </p>
-            <div className="mb-8 space-y-2 text-center text-sm text-white/80">
-              <p>When the night feels heavy, share what's on your mind.</p>
-              <p>
-                We'll match you with a soft-spoken companion who listens without judgement.
-              </p>
-            </div>
 
             {/* Get Started button */}
             <button

@@ -1,7 +1,7 @@
 {
   "name": "nightwhisper",
   "version": "1.0.0",
-  "description": "NightWhisper - A gentle space for late-night thoughts",
+  "description": "Softly, You Heal.",
   "type": "module",
   "scripts": {
     "dev": "vite",
