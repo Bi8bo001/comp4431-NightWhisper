@@ -22,11 +22,13 @@ const musicTracks: MusicTrack[] = [
 interface MusicPlayerProps {
   showSelection?: boolean; // Show music selection UI (for chat screen)
   defaultTrack?: string; // Default track path
+  isDayMode?: boolean; // Day/night mode for styling
 }
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({ 
   showSelection = false, 
-  defaultTrack = '/music/soft-moonlit-haze.mp3' 
+  defaultTrack = '/music/soft-moonlit-haze.mp3',
+  isDayMode = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false); // Start as false, will be triggered by user interaction
   const [isMuted, setIsMuted] = useState(false);
@@ -41,35 +43,55 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   // Get tracks for current category
   const categoryTracks = musicTracks.filter(t => t.category === selectedCategory);
 
-  // Initialize audio on mount
+  // Initialize audio on mount - keep playing across page changes
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.src = currentTrack;
-      audioRef.current.loop = true;
-      audioRef.current.volume = isMuted ? 0 : 0.3;
+      // Only set src if it's different (to avoid interrupting playback)
+      if (audioRef.current.src !== window.location.origin + currentTrack) {
+        const wasPlaying = !audioRef.current.paused;
+        audioRef.current.src = currentTrack;
+        audioRef.current.loop = true;
+        audioRef.current.volume = isMuted ? 0 : 0.3;
+        
+        // If it was playing before, continue playing
+        if (wasPlaying && hasUserInteracted) {
+          audioRef.current.play().catch(e => console.log('Play error:', e));
+        }
+      } else {
+        // Same track, just update volume
+        audioRef.current.volume = isMuted ? 0 : 0.3;
+      }
       
       // Try to play on mount (may be blocked by browser)
-      const tryPlay = async () => {
-        try {
-          await audioRef.current?.play();
-          setIsPlaying(true);
-          setHasUserInteracted(true);
-        } catch (e) {
-          console.log('Auto-play prevented, waiting for user interaction');
-          setIsPlaying(false);
-        }
-      };
-      tryPlay();
+      if (!hasUserInteracted) {
+        const tryPlay = async () => {
+          try {
+            await audioRef.current?.play();
+            setIsPlaying(true);
+            setHasUserInteracted(true);
+          } catch (e) {
+            console.log('Auto-play prevented, waiting for user interaction');
+            setIsPlaying(false);
+          }
+        };
+        tryPlay();
+      } else if (isPlaying && !isMuted) {
+        // User has interacted before, continue playing
+        audioRef.current.play().catch(e => console.log('Play error:', e));
+      }
     }
   }, []); // Only run on mount
 
-  // Update track when currentTrack changes
+  // Update track when currentTrack changes - smooth transition
   useEffect(() => {
-    if (audioRef.current && hasUserInteracted) {
+    if (audioRef.current && hasUserInteracted && audioRef.current.src !== window.location.origin + currentTrack) {
+      const wasPlaying = !audioRef.current.paused;
       audioRef.current.src = currentTrack;
       audioRef.current.load();
-      if (isPlaying && !isMuted) {
+      // Continue playing if it was playing before
+      if (wasPlaying || isPlaying) {
         audioRef.current.play().catch(e => console.log('Play error:', e));
+        setIsPlaying(true);
       }
     }
   }, [currentTrack, hasUserInteracted]);
@@ -147,7 +169,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {/* Music Selection UI (only in chat screen, expandable) */}
         {showSelection && (
           <div 
-            className={`bg-navy/90 backdrop-blur-md rounded-2xl p-4 border border-white/10 shadow-2xl transition-all duration-300 overflow-hidden ${
+            className={`${isDayMode ? 'bg-white/70' : 'bg-navy/90'} backdrop-blur-md rounded-2xl p-4 ${isDayMode ? 'border border-indigo-200/30' : 'border border-white/10'} shadow-2xl transition-all duration-300 overflow-hidden ${
               isExpanded 
                 ? 'max-h-96 opacity-100 translate-y-0' 
                 : 'max-h-0 opacity-0 -translate-y-4 pointer-events-none'
@@ -161,7 +183,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                   onClick={() => handleCategoryChange(cat)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     selectedCategory === cat
-                      ? 'bg-indigo-500/80 text-white shadow-lg shadow-indigo-500/30'
+                      ? isDayMode
+                        ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/30'
+                        : 'bg-indigo-500/80 text-white shadow-lg shadow-indigo-500/30'
+                      : isDayMode
+                      ? 'bg-indigo-100/50 text-indigo-700 hover:bg-indigo-200/70'
                       : 'bg-white/10 text-white/70 hover:bg-white/20'
                   }`}
                 >
@@ -208,7 +234,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         }}
                         className={`cursor-pointer transition-all duration-300 text-center py-2 px-5 rounded-lg ${
                           isSelected 
-                            ? 'bg-indigo-500/30 border-2 border-indigo-400/60 shadow-lg shadow-indigo-500/20' 
+                            ? isDayMode
+                              ? 'bg-indigo-100/80 border-2 border-indigo-400/60 shadow-lg shadow-indigo-500/20'
+                              : 'bg-indigo-500/30 border-2 border-indigo-400/60 shadow-lg shadow-indigo-500/20'
+                            : isDayMode
+                            ? 'hover:bg-indigo-50/50 border-2 border-transparent'
                             : 'hover:bg-white/10 border-2 border-transparent'
                         }`}
                         style={{
@@ -221,7 +251,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
                         }}
                       >
                         <p className={`font-semibold text-sm ${
-                          isSelected ? 'text-white' : 'text-white/70'
+                          isSelected 
+                            ? isDayMode ? 'text-indigo-800' : 'text-white'
+                            : isDayMode ? 'text-gray-700' : 'text-white/70'
                         }`}>
                           {track.name}
                         </p>
@@ -232,19 +264,23 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
               </div>
               
               {/* Scroll indicator gradients - ensure glow is visible */}
-              <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none bg-gradient-to-b from-navy/90 to-transparent"></div>
-              <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none bg-gradient-to-t from-navy/90 to-transparent"></div>
+              <div className={`absolute top-0 left-0 right-0 h-16 pointer-events-none bg-gradient-to-b ${isDayMode ? 'from-white/70' : 'from-navy/90'} to-transparent`}></div>
+              <div className={`absolute bottom-0 left-0 right-0 h-16 pointer-events-none bg-gradient-to-t ${isDayMode ? 'from-white/70' : 'from-navy/90'} to-transparent`}></div>
             </div>
           </div>
         )}
 
         {/* Control Buttons */}
-        <div className="flex items-center gap-2 bg-navy/90 backdrop-blur-md rounded-full px-4 py-2 border border-white/10 shadow-2xl transition-all hover:shadow-indigo-500/20">
+        <div className={`flex items-center gap-2 ${isDayMode ? 'bg-white/70 border border-indigo-200/30' : 'bg-navy/90 border border-white/10'} backdrop-blur-md rounded-full px-4 py-2 shadow-2xl transition-all ${isDayMode ? 'hover:shadow-indigo-500/20' : 'hover:shadow-indigo-500/20'}`}>
           {/* Expand/Collapse Button (only in chat screen) */}
           {showSelection && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-2 rounded-full bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-all hover:scale-110"
+              className={`p-2 rounded-full transition-all hover:scale-110 ${
+                isDayMode
+                  ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80'
+                  : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
+              }`}
               title={isExpanded ? 'Collapse' : 'Expand music selection'}
             >
               <svg 
@@ -262,7 +298,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {!hasUserInteracted && (
             <button
               onClick={enableAudio}
-              className="p-2 rounded-full bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-all hover:scale-110"
+              className={`p-2 rounded-full transition-all hover:scale-110 ${
+                isDayMode
+                  ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80'
+                  : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
+              }`}
               title="Play music"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -279,7 +319,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             }}
             className={`p-2 rounded-full transition-all hover:scale-110 ${
               isMuted 
-                ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' 
+                ? isDayMode
+                  ? 'bg-red-100/80 text-red-600 hover:bg-red-200/80'
+                  : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
+                : isDayMode
+                ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80'
                 : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'
             }`}
             title={isMuted ? 'Unmute' : 'Mute'}
@@ -300,10 +344,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           {!isMuted && isPlaying && (
             <div className="flex items-center gap-1 px-2">
               <div className="flex gap-1">
-                <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
-                <div className="w-1 h-6 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-1 h-4 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                <div className="w-1 h-5 bg-indigo-400 rounded-full animate-pulse" style={{ animationDelay: '0.6s' }}></div>
+                <div className={`w-1 h-4 ${isDayMode ? 'bg-indigo-600' : 'bg-indigo-400'} rounded-full animate-pulse`} style={{ animationDelay: '0s' }}></div>
+                <div className={`w-1 h-6 ${isDayMode ? 'bg-indigo-600' : 'bg-indigo-400'} rounded-full animate-pulse`} style={{ animationDelay: '0.2s' }}></div>
+                <div className={`w-1 h-4 ${isDayMode ? 'bg-indigo-600' : 'bg-indigo-400'} rounded-full animate-pulse`} style={{ animationDelay: '0.4s' }}></div>
+                <div className={`w-1 h-5 ${isDayMode ? 'bg-indigo-600' : 'bg-indigo-400'} rounded-full animate-pulse`} style={{ animationDelay: '0.6s' }}></div>
               </div>
             </div>
           )}

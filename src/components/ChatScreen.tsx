@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnimatedBackground } from './AnimatedBackground';
+import { Sidebar } from './Sidebar';
 import { Healer, Message } from '../types';
 import { getChatResponse, convertToChatMessage } from '../services/chatService';
 import { ChatMessage } from '../api/types';
@@ -8,31 +9,112 @@ import { generateTTS } from '../api/client';
 interface ChatScreenProps {
   healer: Healer;
   userAvatar: string;
+  onBack: () => void;
+  onDayModeChange?: (isDayMode: boolean) => void;
 }
 
 // Note: Fake responses removed - now using API
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) => {
+export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBack, onDayModeChange }) => {
+  // Clear localStorage on component mount (for development)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      // Uncomment the lines below to clear on each reload during development
+      // localStorage.removeItem('moodCalendar');
+      // localStorage.removeItem('diaryEntries');
+    }
+  }, []);
+  
+  const greetingMessage = `Hello, I'm ${healer.name}. ${healer.description.split('.')[0]}. I'll stay with you while you talk.`;
+  
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: `Hello, I'm ${healer.name}. ${healer.description.split('.')[0]}. I'll stay with you while you talk.`,
+      text: greetingMessage,
       sender: 'healer',
       timestamp: new Date(),
+      ttsStatus: 'idle', // Will be set to 'ready' after pre-generation
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isDayMode, setIsDayMode] = useState(false); // Default: night mode
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isFirstMessageGenerated, setIsFirstMessageGenerated] = useState(false);
+  
+  // Notify parent of day mode changes
+  useEffect(() => {
+    if (onDayModeChange) {
+      onDayModeChange(isDayMode);
+    }
+  }, [isDayMode, onDayModeChange]);
   
   // Maintain conversation history in API format
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `Hello, I'm ${healer.name}. ${healer.description.split('.')[0]}. I'll stay with you while you talk.`,
+      content: greetingMessage,
     },
   ]);
+
+  // Pre-generate TTS for first greeting message (only once)
+  useEffect(() => {
+    let isMounted = true;
+    
+    const generateGreetingTTS = async () => {
+      if (isFirstMessageGenerated) return;
+      
+      try {
+        if (isMounted) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === '1' ? { ...msg, ttsStatus: 'generating' } : msg
+            )
+          );
+        }
+
+        const ttsResponse = await generateTTS({
+          text: greetingMessage,
+          healerId: healer.id,
+        });
+
+        if (isMounted) {
+          if (ttsResponse.status === 'ready' && ttsResponse.audioUrl) {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === '1'
+                  ? { ...msg, audioUrl: ttsResponse.audioUrl, ttsStatus: 'ready' }
+                  : msg
+              )
+            );
+            setIsFirstMessageGenerated(true);
+          } else {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === '1' ? { ...msg, ttsStatus: 'error' } : msg
+              )
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error generating greeting TTS:', error);
+        if (isMounted) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === '1' ? { ...msg, ttsStatus: 'error' } : msg
+            )
+          );
+        }
+      }
+    };
+
+    generateGreetingTTS();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [healer.id]); // Only depend on healer.id to prevent duplicate calls
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -96,9 +178,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
           convertToChatMessage(response.message, 'healer'),
         ]);
         
-        // Trigger TTS generation asynchronously (don't wait for it)
-        // This will update status to 'generating' -> 'ready' or 'error'
-        generateTTSForMessage(healerResponse.id, response.message);
+        // Don't generate TTS for subsequent messages (only first greeting has TTS)
+        // Set status to 'idle' so button shows but doesn't actually generate
       } else {
         // Empty response fallback
         console.warn('Empty response from API');
@@ -140,59 +221,55 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
     }
   };
 
-  // Generate TTS for a healer message
-  const generateTTSForMessage = async (messageId: string, text: string) => {
-    // Update status to generating
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === messageId ? { ...msg, ttsStatus: 'generating' } : msg
-      )
-    );
-
-    try {
-      const ttsResponse = await generateTTS({
-        text: text,
-        healerId: healer.id,
-      });
-
-      if (ttsResponse.status === 'ready' && ttsResponse.audioUrl) {
-        // Update message with audio URL - ready to play
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId
-              ? { ...msg, audioUrl: ttsResponse.audioUrl, ttsStatus: 'ready' }
-              : msg
-          )
-        );
-      } else {
-        // Update status to error - will show "No audio"
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === messageId ? { ...msg, ttsStatus: 'error' } : msg
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error generating TTS:', error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, ttsStatus: 'error' } : msg
-        )
-      );
-    }
-  };
-
-  // Play audio for a message
+  // Play audio for a message - separate Audio object so it can play alongside background music
   const playAudio = (audioUrl: string) => {
+    console.log('Attempting to play audio:', audioUrl);
+    
+    // Create a new Audio object (separate from background music)
     const audio = new Audio(audioUrl);
-    audio.play().catch((error) => {
-      console.error('Error playing audio:', error);
-    });
+    
+    // Add error handlers
+    audio.onerror = (e) => {
+      console.error('Audio error:', e);
+      console.error('Audio URL:', audioUrl);
+      console.error('Audio error details:', audio.error);
+      alert(`Failed to play audio. Please check the console for details. URL: ${audioUrl}`);
+    };
+    
+    audio.onloadstart = () => {
+      console.log('Audio loading started:', audioUrl);
+    };
+    
+    audio.oncanplay = () => {
+      console.log('Audio can play:', audioUrl);
+    };
+    
+    audio.oncanplaythrough = () => {
+      console.log('Audio can play through:', audioUrl);
+    };
+    
+    // Try to play
+    audio.play()
+      .then(() => {
+        console.log('Audio playing successfully:', audioUrl);
+      })
+      .catch((error) => {
+        console.error('Error playing audio:', error);
+        console.error('Audio URL:', audioUrl);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        alert(`Failed to play audio: ${error.message}. URL: ${audioUrl}`);
+      });
   };
 
   return (
     <AnimatedBackground backgroundImage={healer.backgroundImage}>
-      <div className={`flex h-screen flex-col overflow-hidden transition-all duration-500 ${
+      {/* Sidebar */}
+      <Sidebar healer={healer} isDayMode={isDayMode} onToggle={setSidebarOpen} isOpen={sidebarOpen} />
+      
+      <div className={`flex h-screen flex-col overflow-hidden transition-all duration-500 relative z-10 ${
+        sidebarOpen ? 'ml-80 w-[calc(100%-20rem)]' : 'ml-0 w-full'
+      } ${
         isDayMode ? 'bg-gradient-to-b from-sky-50/8 to-blue-50/5' : 'bg-black/20'
       }`}>
         {/* Header bar - fixed */}
@@ -202,6 +279,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
             : 'bg-navy/70 border-white/20'
         }`}>
           <div className="mx-auto flex max-w-4xl items-center justify-between">
+            {/* Back Button - Different style from sidebar toggle */}
+            <button
+              onClick={onBack}
+              className={`mr-4 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-500 hover:scale-105 flex items-center gap-2 ${
+                isDayMode
+                  ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80 shadow-md'
+                  : 'bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 shadow-md shadow-indigo-500/20'
+              }`}
+              title="Back to healer selection"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span>Back</span>
+            </button>
+            
             <div className="flex items-center gap-3">
               <img
                 src={healer.avatarSrc}
@@ -299,36 +392,37 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
                   {message.sender === 'healer' && (
                     <button
                       onClick={() => {
-                        if (message.audioUrl && message.ttsStatus === 'ready') {
+                        // Only first message (id === '1') has actual audio
+                        if (message.id === '1' && message.audioUrl && message.ttsStatus === 'ready') {
                           playAudio(message.audioUrl);
+                        } else {
+                          // For other messages, show a message that audio is not available
+                          alert('Audio is only available for the greeting message. Subsequent messages do not have audio generation to save processing time.');
                         }
                       }}
-                      disabled={message.ttsStatus !== 'ready'}
+                      disabled={message.id !== '1' || message.ttsStatus !== 'ready'}
                       className={`self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
-                        message.ttsStatus === 'ready'
+                        message.id === '1' && message.ttsStatus === 'ready'
                           ? isDayMode
                             ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80 hover:scale-105 shadow-md shadow-indigo-300/30'
                             : 'bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 hover:scale-105 shadow-md shadow-indigo-500/30'
-                          : message.ttsStatus === 'generating'
+                          : message.id === '1' && message.ttsStatus === 'generating'
                           ? isDayMode
                             ? 'bg-gray-200/60 text-gray-600 cursor-wait'
                             : 'bg-gray-600/40 text-gray-400 cursor-wait'
-                          : // 'idle' or 'error' - both show "No audio" and are disabled
-                          isDayMode
+                          : isDayMode
                             ? 'bg-gray-200/40 text-gray-500 cursor-not-allowed opacity-60'
                             : 'bg-gray-600/30 text-gray-500 cursor-not-allowed opacity-60'
                       }`}
                       title={
-                        message.ttsStatus === 'ready'
+                        message.id === '1' && message.ttsStatus === 'ready'
                           ? 'Play audio'
-                          : message.ttsStatus === 'generating'
+                          : message.id === '1' && message.ttsStatus === 'generating'
                           ? 'Generating audio...'
-                          : message.ttsStatus === 'idle'
-                          ? 'Audio generation not started'
-                          : 'Audio not available'
+                          : 'Audio not available for this message'
                       }
                     >
-                      {message.ttsStatus === 'generating' ? (
+                      {message.id === '1' && message.ttsStatus === 'generating' ? (
                         <>
                           <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -336,7 +430,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar }) =>
                           </svg>
                           <span>Generating...</span>
                         </>
-                      ) : message.ttsStatus === 'ready' ? (
+                      ) : message.id === '1' && message.ttsStatus === 'ready' ? (
                         <>
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z" />

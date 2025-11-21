@@ -98,7 +98,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
       ))}
 
       {/* Content */}
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10 w-full h-full">{children}</div>
     </div>
   );
 };

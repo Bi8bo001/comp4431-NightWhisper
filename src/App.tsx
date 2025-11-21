@@ -10,6 +10,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
   const [selectedHealer, setSelectedHealer] = useState<Healer | null>(null);
   const [userAvatar, setUserAvatar] = useState<string>('/avatar/style1/female1.png');
+  const [isDayMode, setIsDayMode] = useState(false); // Track day/night mode for music player
 
   const handleGetStarted = () => {
     setCurrentScreen('avatar');
@@ -35,13 +36,19 @@ function App() {
         <HealerSelectionScreen onContinue={handleHealerSelected} />
       )}
       {currentScreen === 'chat' && selectedHealer && (
-        <ChatScreen healer={selectedHealer} userAvatar={userAvatar} />
+        <ChatScreen 
+          healer={selectedHealer} 
+          userAvatar={userAvatar}
+          onBack={() => setCurrentScreen('healer')}
+          onDayModeChange={setIsDayMode}
+        />
       )}
       
-      {/* Global Music Player - shows selection UI only in chat screen */}
+      {/* Global Music Player - available on all screens, continuous playback */}
       <MusicPlayer 
         showSelection={currentScreen === 'chat'} 
-        defaultTrack="/music/soft-moonlit-haze.mp3" 
+        defaultTrack="/music/soft-moonlit-haze.mp3"
+        isDayMode={isDayMode}
       />
     </div>
   );
