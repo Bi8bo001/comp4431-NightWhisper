@@ -28,7 +28,8 @@ export const Diary: React.FC<DiaryProps> = ({ isDayMode }) => {
 
     const newEntries = entries.filter((e) => e.date !== selectedDate);
     newEntries.push(entry);
-    newEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Sort by date in ascending order (oldest first)
+    newEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     setEntries(newEntries);
     localStorage.setItem('diaryEntries', JSON.stringify(newEntries));
@@ -37,7 +38,8 @@ export const Diary: React.FC<DiaryProps> = ({ isDayMode }) => {
   };
 
   const getDatesWithEntries = (): string[] => {
-    return entries.map((e) => e.date).sort().reverse();
+    // Sort by date in ascending order (oldest first)
+    return entries.map((e) => e.date).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   };
 
   return (

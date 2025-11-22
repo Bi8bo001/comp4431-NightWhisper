@@ -574,21 +574,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                     <p className="text-sm leading-relaxed">{message.text}</p>
                   </div>
                   
-                  {/* TTS Play Button (only for healer messages) */}
-                  {message.sender === 'healer' && (
+                  {/* TTS Play Button (only for first greeting message) */}
+                  {message.sender === 'healer' && message.id === '1' && (
                     <button
                       onClick={() => {
-                        // Only first message (id === '1') has actual audio
-                        if (message.id === '1' && message.audioUrl && message.ttsStatus === 'ready') {
+                        if (message.audioUrl && message.ttsStatus === 'ready') {
                           toggleGreetingAudio(message.audioUrl);
-                        } else {
-                          // For other messages, show a message that audio is not available
-                          alert('Audio is only available for the greeting message. Subsequent messages do not have audio generation to save processing time.');
                         }
                       }}
-                      disabled={message.id !== '1' || message.ttsStatus !== 'ready'}
+                      disabled={message.ttsStatus !== 'ready'}
                       className={`self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
-                        message.id === '1' && message.ttsStatus === 'ready'
+                        message.ttsStatus === 'ready'
                           ? isGreetingAudioPlaying
                             ? isDayMode
                               ? 'bg-orange-100/80 text-orange-700 hover:bg-orange-200/80 hover:scale-105 shadow-md shadow-orange-300/30'
@@ -596,7 +592,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                             : isDayMode
                             ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80 hover:scale-105 shadow-md shadow-indigo-300/30'
                             : 'bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 hover:scale-105 shadow-md shadow-indigo-500/30'
-                          : message.id === '1' && message.ttsStatus === 'generating'
+                          : message.ttsStatus === 'generating'
                           ? isDayMode
                             ? 'bg-gray-200/60 text-gray-600 cursor-wait'
                             : 'bg-gray-600/40 text-gray-400 cursor-wait'
@@ -605,14 +601,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                             : 'bg-gray-600/30 text-gray-500 cursor-not-allowed opacity-60'
                       }`}
                       title={
-                        message.id === '1' && message.ttsStatus === 'ready'
+                        message.ttsStatus === 'ready'
                           ? isGreetingAudioPlaying ? 'Pause audio' : 'Play audio'
-                          : message.id === '1' && message.ttsStatus === 'generating'
+                          : message.ttsStatus === 'generating'
                           ? 'Generating audio...'
-                          : 'Audio not available for this message'
+                          : 'Audio not available'
                       }
                     >
-                      {message.id === '1' && message.ttsStatus === 'generating' ? (
+                      {message.ttsStatus === 'generating' ? (
                         <>
                           <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -620,7 +616,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                           </svg>
                           <span>Generating...</span>
                         </>
-                      ) : message.id === '1' && message.ttsStatus === 'ready' ? (
+                      ) : message.ttsStatus === 'ready' ? (
                         <>
                           {isGreetingAudioPlaying ? (
                             <>
