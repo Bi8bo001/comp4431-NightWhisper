@@ -9,11 +9,13 @@ interface SidebarProps {
   isDayMode: boolean;
   onToggle?: (isOpen: boolean) => void;
   isOpen?: boolean;
+  stopGreetingAudio?: () => void;
+  stopVoiceMailboxAudioRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 type SidebarTab = 'mood' | 'diary' | 'mailbox';
 
-export const Sidebar: React.FC<SidebarProps> = ({ healer, isDayMode, onToggle, isOpen: externalIsOpen }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ healer, isDayMode, onToggle, isOpen: externalIsOpen, stopGreetingAudio, stopVoiceMailboxAudioRef }) => {
   const [activeTab, setActiveTab] = useState<SidebarTab>('mood');
   const [internalIsOpen, setInternalIsOpen] = useState(true);
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
@@ -117,7 +119,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ healer, isDayMode, onToggle, i
           <div className="flex-1 overflow-y-auto">
             {activeTab === 'mood' && <MoodCalendar isDayMode={isDayMode} />}
             {activeTab === 'diary' && <Diary isDayMode={isDayMode} />}
-            {activeTab === 'mailbox' && <VoiceMailbox healer={healer} isDayMode={isDayMode} />}
+            {activeTab === 'mailbox' && (
+              <VoiceMailbox 
+                healer={healer} 
+                isDayMode={isDayMode}
+                stopGreetingAudio={stopGreetingAudio}
+                stopVoiceMailboxAudioRef={stopVoiceMailboxAudioRef}
+              />
+            )}
           </div>
         </>
       )}

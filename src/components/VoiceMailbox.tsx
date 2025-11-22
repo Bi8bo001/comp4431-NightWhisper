@@ -4,6 +4,8 @@ import { Healer, VoiceMessage } from '../types';
 interface VoiceMailboxProps {
   healer: Healer;
   isDayMode: boolean;
+  stopGreetingAudio?: () => void;
+  stopVoiceMailboxAudioRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 // Expanded voice messages for each healer
@@ -234,10 +236,32 @@ const VOICE_MESSAGES: Record<string, VoiceMessage[]> = {
   ],
 };
 
-export const VoiceMailbox: React.FC<VoiceMailboxProps> = ({ healer, isDayMode }) => {
+export const VoiceMailbox: React.FC<VoiceMailboxProps> = ({ healer, isDayMode, stopGreetingAudio, stopVoiceMailboxAudioRef }) => {
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRefs = React.useRef<Record<string, HTMLAudioElement>>({});
+  
+  // Register stop function so parent can call it
+  React.useEffect(() => {
+    if (stopVoiceMailboxAudioRef) {
+      stopVoiceMailboxAudioRef.current = () => {
+        // Stop all playing audio
+        Object.values(audioRefs.current).forEach(audio => {
+          if (audio && !audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        });
+        setPlayingId(null);
+      };
+    }
+    
+    return () => {
+      if (stopVoiceMailboxAudioRef) {
+        stopVoiceMailboxAudioRef.current = null;
+      }
+    };
+  }, [stopVoiceMailboxAudioRef]);
 
   useEffect(() => {
     // Get all messages for this healer
@@ -248,73 +272,127 @@ export const VoiceMailbox: React.FC<VoiceMailboxProps> = ({ healer, isDayMode })
   }, [healer.id]);
 
   const handlePlay = (messageId: string, audioUrl: string) => {
-    console.log('VoiceMailbox: Attempting to play audio:', audioUrl);
+    console.log('VoiceMailbox: Attempting to play audio:', audioUrl, 'for healer:', healer.id);
+    
+    // Stop greeting audio if playing
+    if (stopGreetingAudio) {
+      stopGreetingAudio();
+    }
     
     // Stop any currently playing TTS audio (but not background music - they use separate Audio objects)
-    Object.values(audioRefs.current).forEach(audio => {
-      if (audio && !audio.paused) {
+    Object.entries(audioRefs.current).forEach(([id, audio]) => {
+      if (audio && id !== messageId && !audio.paused) {
         audio.pause();
         audio.currentTime = 0;
       }
     });
 
     if (playingId === messageId) {
-      // Pause if already playing
+      // Pause if already playing (toggle behavior)
       const audio = audioRefs.current[messageId];
       if (audio) {
         audio.pause();
         setPlayingId(null);
       }
-    } else {
-      // Play new audio - separate Audio object so it can play alongside background music
-      let audio = audioRefs.current[messageId];
-      if (!audio) {
-        audio = new Audio(audioUrl);
-        audioRefs.current[messageId] = audio;
-        
-        // Add comprehensive error handling
-        audio.onerror = (e) => {
-          console.error('VoiceMailbox audio error:', e);
-          console.error('Audio URL:', audioUrl);
-          console.error('Audio error details:', audio.error);
-          setPlayingId(null);
-          alert(`Failed to load audio. Please check the console. URL: ${audioUrl}`);
-        };
-        
-        audio.onloadstart = () => {
-          console.log('VoiceMailbox: Audio loading started:', audioUrl);
-        };
-        
-        audio.oncanplay = () => {
-          console.log('VoiceMailbox: Audio can play:', audioUrl);
-        };
-        
-        audio.oncanplaythrough = () => {
-          console.log('VoiceMailbox: Audio can play through:', audioUrl);
-        };
-        
-        audio.onended = () => {
-          console.log('VoiceMailbox: Audio finished playing:', audioUrl);
-          setPlayingId(null);
-        };
-      }
-      
-      // Try to play
-      audio.play()
-        .then(() => {
-          console.log('VoiceMailbox: Audio playing successfully:', audioUrl);
-          setPlayingId(messageId);
-        })
-        .catch((error) => {
-          console.error('VoiceMailbox: Error playing audio:', error);
-          console.error('Audio URL:', audioUrl);
-          console.error('Error name:', error.name);
-          console.error('Error message:', error.message);
-          setPlayingId(null);
-          alert(`Failed to play audio: ${error.message}. URL: ${audioUrl}`);
-        });
+      return;
     }
+    
+    // Play new audio - separate Audio object so it can play alongside background music
+    let audio = audioRefs.current[messageId];
+    
+    if (!audio) {
+      // Create new audio object
+      audio = new Audio(audioUrl);
+      audioRefs.current[messageId] = audio;
+      
+      // Add comprehensive error handling
+      audio.onerror = (e) => {
+        console.error('VoiceMailbox audio error:', e);
+        console.error('Audio URL:', audioUrl);
+        console.error('Audio error details:', audio.error);
+        console.error('Healer ID:', healer.id);
+        console.error('Message ID:', messageId);
+        setPlayingId(null);
+        alert(`Failed to load audio for ${healer.name}. URL: ${audioUrl}`);
+      };
+      
+      audio.onloadstart = () => {
+        console.log('VoiceMailbox: Audio loading started:', audioUrl);
+      };
+      
+      audio.oncanplay = () => {
+        console.log('VoiceMailbox: Audio can play:', audioUrl);
+      };
+      
+      audio.oncanplaythrough = () => {
+        console.log('VoiceMailbox: Audio can play through:', audioUrl);
+      };
+      
+      audio.onended = () => {
+        console.log('VoiceMailbox: Audio finished playing:', audioUrl);
+        setPlayingId(null);
+      };
+    } else {
+      // Audio exists - check if URL matches and reset to beginning
+      // Get just the filename part for comparison
+      const getFileName = (url: string) => {
+        return url.split('/').pop()?.split('?')[0] || '';
+      };
+      
+      const currentFileName = getFileName(audio.src);
+      const expectedFileName = getFileName(audioUrl);
+      
+      // If filename doesn't match, reload with new URL
+      if (currentFileName !== expectedFileName) {
+        console.log('VoiceMailbox: Filename changed, reloading audio. Old:', currentFileName, 'New:', expectedFileName);
+        audio.pause();
+        audio.src = audioUrl;
+        audio.load();
+      } else {
+        // Same file, just reset to beginning
+        audio.currentTime = 0;
+      }
+    }
+    
+    // Try to play
+    audio.play()
+      .then(() => {
+        console.log('VoiceMailbox: Audio playing successfully:', audioUrl, 'for healer:', healer.id);
+        setPlayingId(messageId);
+      })
+      .catch((error) => {
+        console.error('VoiceMailbox: Error playing audio:', error);
+        console.error('Audio URL:', audioUrl);
+        console.error('Healer ID:', healer.id);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        setPlayingId(null);
+        // Only show alert for non-autoplay errors
+        if (error.name !== 'NotAllowedError') {
+          alert(`Failed to play audio for ${healer.name}: ${error.message}`);
+        }
+      });
   };
+  
+  // Cleanup: Stop all audio when component unmounts or healer changes
+  useEffect(() => {
+    return () => {
+      // Stop all audio when component unmounts
+      console.log('VoiceMailbox: Cleaning up audio for healer:', healer.id);
+      Object.values(audioRefs.current).forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+          // Remove event listeners to prevent memory leaks
+          audio.onerror = null;
+          audio.onended = null;
+          audio.oncanplay = null;
+          audio.oncanplaythrough = null;
+        }
+      });
+      setPlayingId(null);
+    };
+  }, [healer.id]);
 
   if (messages.length === 0) {
     return (

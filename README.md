@@ -215,7 +215,8 @@ project-code/
 │   │   ├── test_tts_service.py   # TTS test suite
 │   │   └── README.md             # TTS documentation
 │   ├── scripts/                  # Utility scripts
-│   │   └── generate_voice_mailbox_audio.py  # Pre-generate TTS audio
+│   │   ├── generate_chat_greeting_audio.py  # Pre-generate chat greeting TTS audio
+│   │   └── generate_voice_mailbox_audio.py  # Pre-generate voice mailbox TTS audio
 │   ├── CosyVoice/                # CosyVoice library (third-party)
 │   │   ├── pretrained_models/    # Model files (download separately)
 │   │   ├── bunny.wav             # Voice clone files
@@ -404,7 +405,32 @@ http://localhost:5173
 
 ---
 
-## Pre-generating Voice Mailbox Audio
+## Pre-generating TTS Audio
+
+### Chat Greeting Messages (First Message)
+
+To enable instant playback of the first greeting message in chat, pre-generate the audio files:
+
+```bash
+# Make sure you're in the backend directory with nightwhisper environment activated
+cd backend
+conda activate nightwhisper
+
+# Run the chat greeting generation script
+python scripts/generate_chat_greeting_audio.py
+```
+
+This generates audio for the first message that appears when users start chatting with each healer:
+- **milo_chat_greeting.wav**: "Hello, I'm Milo. Warm and patient..."
+- **leo_chat_greeting.wav**: "Hello, I'm Leo. Calm and analytical..."
+- **luna_chat_greeting.wav**: "Hello, I'm Luna. Gentle and present..."
+- **max_chat_greeting.wav**: "Hello, I'm Max. Bright and upbeat..."
+
+**Time Required:**
+- CPU: **3-5 minutes per healer** (4 healers = ~15-20 minutes total)
+- GPU: **3-10 seconds per healer** (~30 seconds total)
+
+### Voice Mailbox Messages
 
 To enable instant playback of voice mailbox messages, pre-generate the audio files:
 
@@ -417,26 +443,36 @@ conda activate nightwhisper
 python scripts/generate_voice_mailbox_audio.py
 ```
 
+This generates audio for all voice mailbox messages (6 messages per healer = 24 total).
+
 **Important Notes:**
-- This takes **3-5 minutes per message on CPU** (24 messages total = ~2 hours)
-- On GPU, it takes **3-10 seconds per message** (~4 minutes total)
-- The script automatically saves files to both `backend/public/tts_audio/` and `public/tts_audio/`
+- Chat Greeting: **3-5 minutes per healer on CPU** (4 healers = ~15-20 minutes)
+- Voice Mailbox: **3-5 minutes per message on CPU** (24 messages = ~2 hours)
+- On GPU, both scripts take **3-10 seconds per message** (~30 seconds for greetings, ~4 minutes for mailbox)
+- Both scripts automatically save files to both `backend/public/tts_audio/` and `public/tts_audio/`
 - **If files already exist, they will be skipped** - safe to run multiple times
-- You can safely interrupt and resume - the script will skip already-generated files
+- You can safely interrupt and resume - the scripts will skip already-generated files
 
 **Running in Background (Recommended):**
 
 ```bash
-# Create a screen session
-screen -S tts_generation
+# Create a screen session for chat greetings
+screen -S chat_greeting_tts
+cd backend
+conda activate nightwhisper
+python scripts/generate_chat_greeting_audio.py
+# Detach: Press Ctrl+A then D
 
-# Run the script
+# Create another screen session for voice mailbox
+screen -S voice_mailbox_tts
 cd backend
 conda activate nightwhisper
 python scripts/generate_voice_mailbox_audio.py
-
 # Detach: Press Ctrl+A then D
-# Reattach later: screen -r tts_generation
+
+# Reattach later:
+# screen -r chat_greeting_tts
+# screen -r voice_mailbox_tts
 ```
 
 ---

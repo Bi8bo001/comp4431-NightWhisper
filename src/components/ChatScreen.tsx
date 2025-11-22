@@ -42,6 +42,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isFirstMessageGenerated, setIsFirstMessageGenerated] = useState(false);
+  const greetingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isGreetingAudioPlaying, setIsGreetingAudioPlaying] = useState(false);
   
   // Notify parent of day mode changes
   useEffect(() => {
@@ -49,6 +51,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
       onDayModeChange(isDayMode);
     }
   }, [isDayMode, onDayModeChange]);
+  
+  // Cleanup: Stop all audio when component unmounts (e.g., when back button is pressed)
+  useEffect(() => {
+    return () => {
+      console.log('ChatScreen: Component unmounting, cleaning up...');
+      // Note: VoiceMailbox has its own cleanup, but we ensure everything is cleaned
+    };
+  }, []);
   
   // Maintain conversation history in API format
   const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([
@@ -58,38 +68,79 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
     },
   ]);
 
-  // Pre-generate TTS for first greeting message (only once)
+  // Load pre-generated TTS audio for first greeting message (if exists)
   useEffect(() => {
+    if (isFirstMessageGenerated) return;
+    
     let isMounted = true;
     
-    const generateGreetingTTS = async () => {
-      if (isFirstMessageGenerated) return;
+    // First, try to use pre-generated audio file
+    const preGeneratedAudioUrl = `/tts_audio/${healer.id}_chat_greeting.wav`;
+    
+    // Test if pre-generated audio exists by trying to load it
+    const testAudio = new Audio(preGeneratedAudioUrl);
+    
+    const handleCanPlay = () => {
+      if (!isMounted) return;
       
-      try {
-        if (isMounted) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === '1' ? { ...msg, ttsStatus: 'generating' } : msg
-            )
-          );
-        }
-
-        const ttsResponse = await generateTTS({
-          text: greetingMessage,
-          healerId: healer.id,
-        });
-
-        if (isMounted) {
-          if (ttsResponse.status === 'ready' && ttsResponse.audioUrl) {
+      console.log('Pre-generated audio found:', preGeneratedAudioUrl);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === '1'
+            ? { ...msg, audioUrl: preGeneratedAudioUrl, ttsStatus: 'ready' }
+            : msg
+        )
+      );
+      setIsFirstMessageGenerated(true);
+      
+      // Clean up test audio
+      testAudio.oncanplay = null;
+      testAudio.onerror = null;
+      testAudio.src = '';
+    };
+    
+    const handleError = () => {
+      if (!isMounted) return;
+      
+      console.log('Pre-generated audio not found, generating on-the-fly:', preGeneratedAudioUrl);
+      
+      // Fallback to dynamic generation
+      const generateGreetingTTS = async () => {
+        try {
+          if (isMounted) {
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === '1'
-                  ? { ...msg, audioUrl: ttsResponse.audioUrl, ttsStatus: 'ready' }
-                  : msg
+                msg.id === '1' ? { ...msg, ttsStatus: 'generating' } : msg
               )
             );
-            setIsFirstMessageGenerated(true);
-          } else {
+          }
+
+          const ttsResponse = await generateTTS({
+            text: greetingMessage,
+            healerId: healer.id,
+          });
+
+          if (isMounted) {
+            if (ttsResponse.status === 'ready' && ttsResponse.audioUrl) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === '1'
+                    ? { ...msg, audioUrl: ttsResponse.audioUrl, ttsStatus: 'ready' }
+                    : msg
+                )
+              );
+              setIsFirstMessageGenerated(true);
+            } else {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === '1' ? { ...msg, ttsStatus: 'error' } : msg
+                )
+              );
+            }
+          }
+        } catch (error) {
+          console.error('Error generating greeting TTS:', error);
+          if (isMounted) {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === '1' ? { ...msg, ttsStatus: 'error' } : msg
@@ -97,24 +148,69 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
             );
           }
         }
-      } catch (error) {
-        console.error('Error generating greeting TTS:', error);
-        if (isMounted) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === '1' ? { ...msg, ttsStatus: 'error' } : msg
-            )
-          );
-        }
+      };
+
+      generateGreetingTTS();
+      
+      // Clean up test audio
+      testAudio.oncanplay = null;
+      testAudio.onerror = null;
+      testAudio.src = '';
+    };
+    
+    let hasHandled = false; // Flag to prevent double handling
+    
+    const safeHandleCanPlay = () => {
+      if (!hasHandled && isMounted) {
+        hasHandled = true;
+        handleCanPlay();
       }
     };
-
-    generateGreetingTTS();
+    
+    const safeHandleError = () => {
+      if (!hasHandled && isMounted) {
+        hasHandled = true;
+        handleError();
+      }
+    };
+    
+    testAudio.oncanplay = safeHandleCanPlay;
+    testAudio.oncanplaythrough = safeHandleCanPlay; // Also listen for canplaythrough for more reliable detection
+    testAudio.onerror = safeHandleError;
+    testAudio.onloadstart = () => {
+      console.log('Testing pre-generated audio file:', preGeneratedAudioUrl);
+    };
+    
+    // Trigger loading to test if file exists
+    testAudio.load();
+    
+    // Set a timeout to handle cases where loading takes too long
+    const timeout = setTimeout(() => {
+      if (!isMounted || hasHandled) return;
+      
+      // Check readyState to see if file loaded
+      console.log('Audio loading timeout check. ReadyState:', testAudio.readyState, 'URL:', preGeneratedAudioUrl);
+      if (testAudio.readyState >= 2) {
+        // Data is available, file exists
+        console.log('File exists (readyState >= 2), using pre-generated audio');
+        safeHandleCanPlay();
+      } else {
+        // No data loaded yet, assume file doesn't exist or failed to load
+        console.log('File does not exist or failed to load, generating dynamically');
+        safeHandleError();
+      }
+    }, 2000);
     
     return () => {
       isMounted = false;
+      clearTimeout(timeout);
+      testAudio.oncanplay = null;
+      testAudio.oncanplaythrough = null;
+      testAudio.onerror = null;
+      testAudio.onloadstart = null;
+      testAudio.src = '';
     };
-  }, [healer.id]); // Only depend on healer.id to prevent duplicate calls
+  }, [healer.id, greetingMessage, isFirstMessageGenerated]); // Include all dependencies
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -221,51 +317,141 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
     }
   };
 
-  // Play audio for a message - separate Audio object so it can play alongside background music
-  const playAudio = (audioUrl: string) => {
-    console.log('Attempting to play audio:', audioUrl);
+  // Ref to stop VoiceMailbox audio when greeting audio plays
+  const stopVoiceMailboxAudioRef = useRef<(() => void) | null>(null);
+  
+  // Function to stop all VoiceMailbox audio
+  const stopVoiceMailboxAudio = () => {
+    if (stopVoiceMailboxAudioRef.current) {
+      stopVoiceMailboxAudioRef.current();
+    }
+  };
+  
+  // Toggle audio playback for greeting message - separate Audio object so it can play alongside background music
+  const toggleGreetingAudio = (audioUrl: string) => {
+    console.log('Toggle greeting audio:', audioUrl, 'Currently playing:', isGreetingAudioPlaying);
     
-    // Create a new Audio object (separate from background music)
-    const audio = new Audio(audioUrl);
+    // If audio is currently playing, pause it
+    if (isGreetingAudioPlaying && greetingAudioRef.current) {
+      greetingAudioRef.current.pause();
+      greetingAudioRef.current.currentTime = 0;
+      setIsGreetingAudioPlaying(false);
+      return;
+    }
     
-    // Add error handlers
-    audio.onerror = (e) => {
-      console.error('Audio error:', e);
-      console.error('Audio URL:', audioUrl);
-      console.error('Audio error details:', audio.error);
-      alert(`Failed to play audio. Please check the console for details. URL: ${audioUrl}`);
-    };
+    // Stop VoiceMailbox audio before playing greeting audio
+    stopVoiceMailboxAudio();
     
-    audio.onloadstart = () => {
-      console.log('Audio loading started:', audioUrl);
-    };
+    // Stop any existing audio first
+    if (greetingAudioRef.current) {
+      greetingAudioRef.current.pause();
+      greetingAudioRef.current.currentTime = 0;
+    }
     
-    audio.oncanplay = () => {
-      console.log('Audio can play:', audioUrl);
-    };
+    // Create a new Audio object (or reuse existing one if URL matches)
+    let audio: HTMLAudioElement | null = greetingAudioRef.current;
     
-    audio.oncanplaythrough = () => {
-      console.log('Audio can play through:', audioUrl);
-    };
+    if (!audio || (audio.src && !audio.src.endsWith(audioUrl.split('/').pop() || ''))) {
+      audio = new Audio(audioUrl);
+      greetingAudioRef.current = audio;
+      
+      // Add error handlers
+      audio.onerror = (e) => {
+        console.error('Greeting audio error:', e);
+        console.error('Audio URL:', audioUrl);
+        console.error('Audio error details:', audio?.error || 'Unknown error');
+        setIsGreetingAudioPlaying(false);
+        alert(`Failed to play audio. Please check the console for details. URL: ${audioUrl}`);
+      };
+      
+      audio.onloadstart = () => {
+        console.log('Greeting audio loading started:', audioUrl);
+      };
+      
+      audio.oncanplay = () => {
+        console.log('Greeting audio can play:', audioUrl);
+      };
+      
+      audio.oncanplaythrough = () => {
+        console.log('Greeting audio can play through:', audioUrl);
+      };
+      
+      audio.onended = () => {
+        console.log('Greeting audio finished playing:', audioUrl);
+        setIsGreetingAudioPlaying(false);
+        if (greetingAudioRef.current) {
+          greetingAudioRef.current.currentTime = 0;
+        }
+      };
+      
+      audio.onpause = () => {
+        console.log('Greeting audio paused:', audioUrl);
+        setIsGreetingAudioPlaying(false);
+      };
+    } else {
+      // Reuse existing audio, just reset to beginning
+      if (audio) {
+        audio.currentTime = 0;
+      }
+    }
     
-    // Try to play
+    // Try to play (ensure audio is not null)
+    if (!audio) {
+      console.error('Audio object is null, cannot play');
+      return;
+    }
+    
     audio.play()
       .then(() => {
-        console.log('Audio playing successfully:', audioUrl);
+        console.log('Greeting audio playing successfully:', audioUrl);
+        setIsGreetingAudioPlaying(true);
       })
       .catch((error) => {
-        console.error('Error playing audio:', error);
+        console.error('Error playing greeting audio:', error);
         console.error('Audio URL:', audioUrl);
         console.error('Error name:', error.name);
         console.error('Error message:', error.message);
-        alert(`Failed to play audio: ${error.message}. URL: ${audioUrl}`);
+        setIsGreetingAudioPlaying(false);
+        // Only show alert for non-autoplay errors
+        if (error.name !== 'NotAllowedError') {
+          alert(`Failed to play audio: ${error.message}. URL: ${audioUrl}`);
+        }
       });
   };
+  
+  // Cleanup: Stop audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (greetingAudioRef.current) {
+        greetingAudioRef.current.pause();
+        greetingAudioRef.current.currentTime = 0;
+        greetingAudioRef.current.onerror = null;
+        greetingAudioRef.current.onended = null;
+        greetingAudioRef.current.onpause = null;
+        greetingAudioRef.current = null;
+      }
+      setIsGreetingAudioPlaying(false);
+    };
+  }, []);
 
   return (
-    <AnimatedBackground backgroundImage={healer.backgroundImage}>
+      <AnimatedBackground backgroundImage={healer.backgroundImage}>
       {/* Sidebar */}
-      <Sidebar healer={healer} isDayMode={isDayMode} onToggle={setSidebarOpen} isOpen={sidebarOpen} />
+      <Sidebar 
+        healer={healer} 
+        isDayMode={isDayMode} 
+        onToggle={setSidebarOpen} 
+        isOpen={sidebarOpen}
+        stopGreetingAudio={() => {
+          // Stop greeting audio when VoiceMailbox audio plays
+          if (isGreetingAudioPlaying && greetingAudioRef.current) {
+            greetingAudioRef.current.pause();
+            greetingAudioRef.current.currentTime = 0;
+            setIsGreetingAudioPlaying(false);
+          }
+        }}
+        stopVoiceMailboxAudioRef={stopVoiceMailboxAudioRef}
+      />
       
       <div className={`flex h-screen flex-col overflow-hidden transition-all duration-500 relative z-10 ${
         sidebarOpen ? 'ml-80 w-[calc(100%-20rem)]' : 'ml-0 w-full'
@@ -394,7 +580,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                       onClick={() => {
                         // Only first message (id === '1') has actual audio
                         if (message.id === '1' && message.audioUrl && message.ttsStatus === 'ready') {
-                          playAudio(message.audioUrl);
+                          toggleGreetingAudio(message.audioUrl);
                         } else {
                           // For other messages, show a message that audio is not available
                           alert('Audio is only available for the greeting message. Subsequent messages do not have audio generation to save processing time.');
@@ -403,7 +589,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                       disabled={message.id !== '1' || message.ttsStatus !== 'ready'}
                       className={`self-start flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 ${
                         message.id === '1' && message.ttsStatus === 'ready'
-                          ? isDayMode
+                          ? isGreetingAudioPlaying
+                            ? isDayMode
+                              ? 'bg-orange-100/80 text-orange-700 hover:bg-orange-200/80 hover:scale-105 shadow-md shadow-orange-300/30'
+                              : 'bg-orange-500/40 text-orange-200 hover:bg-orange-500/50 hover:scale-105 shadow-md shadow-orange-500/30'
+                            : isDayMode
                             ? 'bg-indigo-100/80 text-indigo-700 hover:bg-indigo-200/80 hover:scale-105 shadow-md shadow-indigo-300/30'
                             : 'bg-indigo-500/30 text-indigo-200 hover:bg-indigo-500/40 hover:scale-105 shadow-md shadow-indigo-500/30'
                           : message.id === '1' && message.ttsStatus === 'generating'
@@ -416,7 +606,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                       }`}
                       title={
                         message.id === '1' && message.ttsStatus === 'ready'
-                          ? 'Play audio'
+                          ? isGreetingAudioPlaying ? 'Pause audio' : 'Play audio'
                           : message.id === '1' && message.ttsStatus === 'generating'
                           ? 'Generating audio...'
                           : 'Audio not available for this message'
@@ -432,10 +622,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
                         </>
                       ) : message.id === '1' && message.ttsStatus === 'ready' ? (
                         <>
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
-                          <span>Listen</span>
+                          {isGreetingAudioPlaying ? (
+                            <>
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                              </svg>
+                              <span>Pause</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                              <span>Listen</span>
+                            </>
+                          )}
                         </>
                       ) : (
                         <>
@@ -534,4 +735,3 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ healer, userAvatar, onBa
     </AnimatedBackground>
   );
 };
-
