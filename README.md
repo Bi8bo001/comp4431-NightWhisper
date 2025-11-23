@@ -30,9 +30,8 @@
 10. [Knowledge Base & Prompts](#knowledge-base--prompts)
 11. [API Documentation](#api-documentation)
 12. [Screenshots](#screenshots)
-13. [Troubleshooting](#troubleshooting)
-14. [Documentation](#documentation)
-15. [Future Enhancements](#future-enhancements)
+13. [Documentation](#documentation)
+14. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -620,87 +619,6 @@ Returns the generated audio file.
   <img src="./public/page4-day.png" alt="Chat Interface - Day Mode" width="45%" style="margin: 10px;">
   <img src="./public/page4-night.png" alt="Chat Interface - Night Mode" width="45%" style="margin: 10px;">
 </div>
-
----
-
-## Troubleshooting
-
-### Frontend Issues
-
-**Port already in use:**
-```bash
-# Find and kill process using port 5173
-lsof -ti:5173 | xargs kill -9
-```
-
-**Changes not reflecting:**
-- Hard refresh browser (Ctrl+Shift+R or Cmd+Shift+R)
-- Clear browser cache
-- Restart dev server
-
-### Backend Issues
-
-**Module not found errors:**
-- Ensure conda environment is activated: `conda activate nightwhisper`
-- Reinstall dependencies: `pip install -r requirements.txt`
-
-**API key not working:**
-- Check `backend/.env` file exists and contains `OPENAI_API_KEY=your_key`
-- Restart backend server after adding/changing API key
-
-**RAG not working:**
-- Ensure knowledge base is built: `python -m rag.build_kb`
-- Check `backend/rag/vector_store/` directory exists
-
-### TTS Issues
-
-**TTS generation fails:**
-- Check CosyVoice model is downloaded in `backend/CosyVoice/pretrained_models/`
-- Verify voice clone files exist: `bunny.wav`, `owl.wav`, `dear.wav`, `dog.wav`
-- Check backend logs for detailed error messages
-- Run test suite: `python backend/tts/test_tts_service.py`
-
-**TTS generation very slow:**
-- This is normal on CPU (3-5 minutes per message)
-- Use GPU for faster generation (3-10 seconds per message)
-- Check GPU availability: `python -c "import torch; print(torch.cuda.is_available())"`
-
-**Audio not playing:**
-- Check browser console for errors
-- Verify audio file exists at the URL
-- Check CORS settings if accessing from different domain
-- Ensure audio format is WAV (browser-supported)
-
-### Sidebar Issues
-
-**Sidebar not visible:**
-- Check browser console for errors
-- Verify `Sidebar` component is imported in `ChatScreen.tsx`
-- Ensure chat area has correct margin when sidebar is open
-
-**Mood/Diary data not saving:**
-- Check browser localStorage is enabled (not in private/incognito mode)
-- Open browser DevTools → Application → Local Storage
-- Verify keys: `moodCalendar` and `diaryEntries`
-
-**Voice mailbox audio not playing:**
-- Ensure audio files exist in `public/tts_audio/` directory
-- Run pre-generation script: `python backend/scripts/generate_voice_mailbox_audio.py`
-- Check browser console for audio loading errors
-- Verify file paths in `VoiceMailbox.tsx` match actual files
-
-### Performance Issues
-
-**API responses slow:**
-- Check if RAG retrieval is enabled (adds ~1-2 seconds)
-- Verify network connection
-- Check backend logs for GPT-4o API delays
-- Consider disabling RAG temporarily for testing: set `enableRAG: false` in `chatService.ts`
-
-**Music not playing:**
-- Check browser autoplay restrictions
-- Click play button to enable audio
-- Verify music files exist in `public/music/` directory
 
 ---
 
