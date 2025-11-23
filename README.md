@@ -93,7 +93,7 @@ The system is designed with modularity in mind, allowing each component to be de
 
 ### 1. **Personalized Healer Selection**
 
-Four unique AI healer personas, each with distinct personality traits, communication styles, and therapeutic approaches:
+Four unique AI healer personas, each with distinct personality traits, communication styles, and therapeutic approaches. All healer avatars are generated using **DALL-E 3 (text-to-image)** to produce personalized, animal-themed avatars for each "healer".
 
 <div align="center">
 
@@ -136,6 +136,30 @@ Four unique AI healer personas, each with distinct personality traits, communica
 - Customizable user avatars with multiple styles (Soft Anime, Calm Minimal)
 - Gender and style options
 - Personalization for enhanced user experience
+
+<div align="center">
+
+**Style 1 - Soft Anime**
+
+| | | | | |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="./public/avatar/style1/female1.png" alt="Style 1 Female 1" width="80"> | <img src="./public/avatar/style1/female2.png" alt="Style 1 Female 2" width="80"> | <img src="./public/avatar/style1/female3.png" alt="Style 1 Female 3" width="80"> | <img src="./public/avatar/style1/female4.png" alt="Style 1 Female 4" width="80"> | <img src="./public/avatar/style1/female5.png" alt="Style 1 Female 5" width="80"> |
+
+| | | | | |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="./public/avatar/style1/male1.png" alt="Style 1 Male 1" width="80"> | <img src="./public/avatar/style1/male2.png" alt="Style 1 Male 2" width="80"> | <img src="./public/avatar/style1/male3.png" alt="Style 1 Male 3" width="80"> | <img src="./public/avatar/style1/male4.png" alt="Style 1 Male 4" width="80"> | <img src="./public/avatar/style1/male5.png" alt="Style 1 Male 5" width="80"> |
+
+**Style 2 - Calm Minimal**
+
+| | | | | |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="./public/avatar/style2/female1.png" alt="Style 2 Female 1" width="80"> | <img src="./public/avatar/style2/female2.png" alt="Style 2 Female 2" width="80"> | <img src="./public/avatar/style2/female3.png" alt="Style 2 Female 3" width="80"> | <img src="./public/avatar/style2/female4.png" alt="Style 2 Female 4" width="80"> | <img src="./public/avatar/style2/female5.png" alt="Style 2 Female 5" width="80"> |
+
+| | | | | |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="./public/avatar/style2/male1.png" alt="Style 2 Male 1" width="80"> | <img src="./public/avatar/style2/male2.png" alt="Style 2 Male 2" width="80"> | <img src="./public/avatar/style2/male3.png" alt="Style 2 Male 3" width="80"> | <img src="./public/avatar/style2/male4.png" alt="Style 2 Male 4" width="80"> | <img src="./public/avatar/style2/male5.png" alt="Style 2 Male 5" width="80"> |
+
+</div>
 
 ### 7. **Interactive Sidebar Features**
 - **📅 Mood Calendar**: Track daily mood with color-coded calendar (1-5 scale)
