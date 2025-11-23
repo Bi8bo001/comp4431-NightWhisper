@@ -29,9 +29,8 @@
 9. [Pre-generating Voice Mailbox Audio](#pre-generating-voice-mailbox-audio)
 10. [Knowledge Base & Prompts](#knowledge-base--prompts)
 11. [API Documentation](#api-documentation)
-12. [Screenshots](#screenshots)
-13. [Documentation](#documentation)
-14. [Future Enhancements](#future-enhancements)
+12. [Documentation](#documentation)
+13. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -46,6 +45,23 @@ The platform features four unique AI healer personas, each with distinct persona
 ![System Workflow](./public/comp4431_workflow.png)
 
 The workflow diagram above illustrates the complete system architecture, from user input through AI processing to response generation.
+
+### Demo Screenshots
+
+**Landing Page, Avatar Selection, and Healer Selection**
+
+<div align="center">
+  <img src="./public/page1.png" alt="Landing Page" width="30%" style="margin: 10px;">
+  <img src="./public/page2.png" alt="Avatar Selection" width="30%" style="margin: 10px;">
+  <img src="./public/page3.png" alt="Healer Selection" width="30%" style="margin: 10px;">
+</div>
+
+**Chat Interface - Day and Night Modes**
+
+<div align="center">
+  <img src="./public/page4-day.png" alt="Chat Interface - Day Mode" width="45%" style="margin: 10px;">
+  <img src="./public/page4-night.png" alt="Chat Interface - Night Mode" width="45%" style="margin: 10px;">
+</div>
 
 ---
 
@@ -600,25 +616,6 @@ Response:
 GET /api/tts/audio/{filename}
 ```
 Returns the generated audio file.
-
----
-
-## Screenshots
-
-### Landing Page, Avatar Selection, and Healer Selection
-
-<div align="center">
-  <img src="./public/page1.png" alt="Landing Page" width="30%" style="margin: 10px;">
-  <img src="./public/page2.png" alt="Avatar Selection" width="30%" style="margin: 10px;">
-  <img src="./public/page3.png" alt="Healer Selection" width="30%" style="margin: 10px;">
-</div>
-
-### Chat Interface - Day and Night Modes
-
-<div align="center">
-  <img src="./public/page4-day.png" alt="Chat Interface - Day Mode" width="45%" style="margin: 10px;">
-  <img src="./public/page4-night.png" alt="Chat Interface - Night Mode" width="45%" style="margin: 10px;">
-</div>
 
 ---
 
